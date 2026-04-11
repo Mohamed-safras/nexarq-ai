@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@nexarq/common": ["./common/src/index.ts"],
+      "@nexarq/common/types": ["./common/src/types/index.ts"],
+      "@nexarq/common/interfaces": ["./common/src/interfaces/index.ts"],
+      "@nexarq/common/interfaces/*": ["./common/src/interfaces/*.ts"],
+      "@nexarq/common/constants": ["./common/src/constants/index.ts"],
+      "@nexarq/common/utils": ["./common/src/utils/index.ts"]
+    }
+  }
+}

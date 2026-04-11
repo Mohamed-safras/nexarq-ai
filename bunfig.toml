@@ -1,0 +1,8 @@
+[install]
+exact = false
+
+[install.scopes]
+"@nexarq" = { token = "$NPM_TOKEN" }
+
+[run]
+bun = true

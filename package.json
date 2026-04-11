@@ -1,0 +1,28 @@
+{
+  "name": "nexarq-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "common",
+    "packages/*",
+    "cli",
+    "sdk",
+    "web"
+  ],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "dev": "bun run --filter '{web,cli}' dev",
+    "dev:web": "bun run --cwd web dev",
+    "dev:cli": "bun run --cwd cli dev",
+    "test": "bun run --filter '*' test",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun run --filter '*' typecheck",
+    "clean": "bun run --filter '*' clean",
+    "db:migrate": "bun run --cwd web db:migrate",
+    "db:studio": "bun run --cwd web db:studio"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.7.0"
+  }
+}

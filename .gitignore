@@ -1,21 +1,5 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-*.whl
-
-# Virtual envs
-.venv/
-venv/
-env/
-.env
+node_modules/
+dists/
 
 # Secrets — never commit these
 .vault
