@@ -1,31 +1,32 @@
-node_modules/
-dists/
-
-# Secrets — never commit these
-.vault
-.vault_key
-*.pem
-*.key
-
-# Testing / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Type checking
-.mypy_cache/
-.ruff_cache/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
+.idea/
+.vercel
 
-# Nexarq runtime (user-local, not project files)
-.nexarq/
+# Environment files (secrets) - Bun loads .env.* files natively
+.env
+.env.*
+!.env.example
+
+# ctags
+tags
+
+node_modules
+dev
+dist
+dist-env
+tsconfig.tsbuildinfo
+.manicode
+__mock-projects__
+npm-app/src/__tests__/data/
+.aider*
+.nexarq-ai*
+**.log
+
+debug/
+
+# Nx cache directories
+.nx/cache
+.nx/workspace-data
+
+# Infisical config (user-specific)
+.infisical.json
