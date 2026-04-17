@@ -7,16 +7,19 @@ Nexarq is an agentic code review CLI that lives in your terminal — it reads yo
 ## Installation
 
 **macOS / Linux**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nexarq/nexarq-cli/main/install.sh | bash
 ```
 
 **Windows (PowerShell)**
+
 ```powershell
 irm https://raw.githubusercontent.com/nexarq/nexarq-cli/main/install.ps1 | iex
 ```
 
 **Via pip**
+
 ```bash
 pip install nexarq-cli
 ```
@@ -56,30 +59,30 @@ nexarq help
 
 ## Agents
 
-| Agent | Focus |
-|-------|-------|
-| `security` | OWASP Top 10, secrets, injection |
-| `bugs` | Logic errors, edge cases |
-| `performance` | Complexity, N+1, memory |
-| `review` | Style, naming, best practices |
-| `architecture` | SOLID, design patterns |
-| `devops` | Docker, CI/CD, IaC |
-| `refactor` | DRY, complexity reduction |
-| `docstring` | Missing documentation |
-| `type_safety` | Type annotations |
-| `test_coverage` | Missing tests |
-| `dependency` | Vulnerable packages |
-| `api_design` | REST conventions |
-| `database` | Query safety, migrations |
-| `concurrency` | Race conditions, async |
-| `error_handling` | Exception patterns |
-| `logging` | PII in logs, log levels |
-| `maintainability` | Cyclomatic complexity |
-| `accessibility` | WCAG 2.1, ARIA |
-| `compliance` | GDPR, HIPAA, PCI-DSS |
-| `explain` | Plain-English walkthrough |
-| `memory_safety` | Resource leaks |
-| `standards` | Project-specific rules |
+| Agent             | Focus                            |
+| ----------------- | -------------------------------- |
+| `security`        | OWASP Top 10, secrets, injection |
+| `bugs`            | Logic errors, edge cases         |
+| `performance`     | Complexity, N+1, memory          |
+| `review`          | Style, naming, best practices    |
+| `architecture`    | SOLID, design patterns           |
+| `devops`          | Docker, CI/CD, IaC               |
+| `refactor`        | DRY, complexity reduction        |
+| `docstring`       | Missing documentation            |
+| `type_safety`     | Type annotations                 |
+| `test_coverage`   | Missing tests                    |
+| `dependency`      | Vulnerable packages              |
+| `api_design`      | REST conventions                 |
+| `database`        | Query safety, migrations         |
+| `concurrency`     | Race conditions, async           |
+| `error_handling`  | Exception patterns               |
+| `logging`         | PII in logs, log levels          |
+| `maintainability` | Cyclomatic complexity            |
+| `accessibility`   | WCAG 2.1, ARIA                   |
+| `compliance`      | GDPR, HIPAA, PCI-DSS             |
+| `explain`         | Plain-English walkthrough        |
+| `memory_safety`   | Resource leaks                   |
+| `standards`       | Project-specific rules           |
 
 ## LLM Providers
 
@@ -121,6 +124,16 @@ nexarq hook install pre-push      # Review before push
 nexarq hook status
 ```
 
+## Contributing
+
+Nexarq is free and open-source. Contributions are welcome — new agents, LLM provider adapters, CLI improvements, and bug fixes.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
+
+## Security
+
+To report a vulnerability privately, see [SECURITY.md](SECURITY.md). Do not open a public issue.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
