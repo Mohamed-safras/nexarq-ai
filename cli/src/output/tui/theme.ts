@@ -185,3 +185,32 @@ export function getThemeByVariant(variant: ThemeVariant): NexarqTheme {
 export const THEME: NexarqTheme = dark
 
 export type SeverityKey = keyof NexarqTheme['severity']
+
+/**
+ * Convert a hex color string (#rrggbb) to an ANSI 24-bit foreground escape.
+ * Falls back to empty string if the hex is invalid so callers are safe.
+ */
+export function hex2fg(hex: string): string {
+  const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+  if (!m || !m[1] || !m[2] || !m[3]) return ''
+  return `\x1b[38;2;${parseInt(m[1], 16)};${parseInt(m[2], 16)};${parseInt(m[3], 16)}m`
+}
+
+/** Build a set of ANSI escape strings from a NexarqTheme */
+export function themeToAnsi(t: NexarqTheme) {
+  return {
+    fg:       hex2fg(t.fg),
+    dim:      hex2fg(t.fgDim),
+    cyan:     hex2fg(t.cyan),
+    green:    hex2fg(t.green),
+    yellow:   hex2fg(t.yellow),
+    red:      hex2fg(t.red),
+    orange:   hex2fg(t.orange),
+    purple:   hex2fg(t.purple),
+    critical: hex2fg(t.severity.critical),
+    high:     hex2fg(t.severity.high),
+    medium:   hex2fg(t.severity.medium),
+    low:      hex2fg(t.severity.low),
+    info:     hex2fg(t.severity.info),
+  }
+}

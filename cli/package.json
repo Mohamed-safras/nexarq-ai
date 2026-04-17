@@ -1,0 +1,47 @@
+{
+  "name": "nexarq",
+  "version": "0.1.0",
+  "description": "multi-agent code review",
+  "type": "module",
+  "bin": {
+    "nexarq": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir bin --target bun --format esm --no-splitting",
+    "global-install": "bun link",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "code-review",
+    "ai",
+    "llm",
+    "security",
+    "git",
+    "agents"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexarq/nexarq"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.4.1",
+    "@nexarq/agent-runtime": "workspace:*",
+    "@nexarq/common": "workspace:*",
+    "@opentui/core": "latest",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "conf": "^13.0.0",
+    "keytar": "^7.9.0",
+    "open": "^10.0.0",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
