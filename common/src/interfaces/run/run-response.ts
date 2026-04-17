@@ -1,5 +1,5 @@
-import type { AgentResult } from '../agent/agent-result.js'
-import type { RunSummary } from './run-summary.js'
+import type { AgentResult } from '../agent/agent-result.ts'
+import type { RunSummary } from './run-summary.ts'
 
 export interface RunResponse {
   runId: string

@@ -1,3 +1,3 @@
-export * from './llm-request.js'
-export * from './llm-response.js'
-export * from './llm-provider.js'
+export * from './llm-request.ts'
+export * from './llm-response.ts'
+export * from './llm-provider.ts'

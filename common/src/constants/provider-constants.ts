@@ -4,7 +4,7 @@ import type { AgentMode } from '../types/agent-types.ts'
 export const DEFAULT_PROVIDER: ProviderName = 'ollama'
 
 export const PROVIDER_MODELS: Record<ProviderName, string[]> = {
-  ollama:    ['codellama', 'llama3.2', 'qwen2.5-coder', 'deepseek-coder-v2'],
+  ollama:    ['minimax-m2.7:cloud', 'kimi-k2:cloud', 'qwen3.5:4b', 'qwen2.5-coder', 'deepseek-coder-v2', 'llama3.2', 'codellama'],
   openai:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
   anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
   google:    ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
@@ -14,7 +14,7 @@ export const PROVIDER_MODELS: Record<ProviderName, string[]> = {
 }
 
 export const PROVIDER_DEFAULT_MODELS: Record<ProviderName, string> = {
-  ollama:    'codellama',
+  ollama:    'minimax-m2.7:cloud',
   openai:    'gpt-4o',
   anthropic: 'claude-sonnet-4-6',
   google:    'gemini-2.5-flash',
@@ -43,10 +43,10 @@ export const MINIMAX_DEFAULT_URL  = 'https://api.minimax.io/v1'
  */
 export const MODE_MODELS: Record<ProviderName, Record<AgentMode, string>> = {
   ollama: {
-    fast:  'llama3.2',
-    smart: 'qwen2.5-coder',
-    deep:  'deepseek-coder-v2',
-    auto:  'qwen2.5-coder',
+    fast:  'minimax-m2.7:cloud',
+    smart: 'minimax-m2.7:cloud',
+    deep:  'kimi-k2:cloud',
+    auto:  'minimax-m2.7:cloud',
   },
   openai: {
     fast:  'gpt-4o-mini',   // $0.15/1M — 20x cheaper than gpt-4o
@@ -83,4 +83,15 @@ export const MODE_MAX_DIFF_TOKENS: Record<AgentMode, number> = {
   smart: 6_000,
   deep:  16_000,
   auto:  6_000,
+}
+
+/**
+ * Max output tokens the LLM may generate per agent per mode.
+ * Shorter budgets finish faster; deep mode unlocks full verbosity.
+ */
+export const MODE_MAX_OUTPUT_TOKENS: Record<AgentMode, number> = {
+  fast:  512,
+  smart: 1_024,
+  deep:  4_096,
+  auto:  1_024,
 }

@@ -1,5 +1,5 @@
-import type { ProviderName } from '../../types/agent-types.js'
-import type { TokenUsage } from '../agent/token-usage.js'
+import type { ProviderName } from '../../types/agent-types.ts'
+import type { TokenUsage } from '../agent/token-usage.ts'
 
 export interface LLMResponse {
   text: string

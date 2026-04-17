@@ -1,4 +1,4 @@
-import type { ProviderName } from '../../types/agent-types.js'
+import type { ProviderName } from '../../types/agent-types.ts'
 
 export interface LLMRequest {
   systemPrompt: string

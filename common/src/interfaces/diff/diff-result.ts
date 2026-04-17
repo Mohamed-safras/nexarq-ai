@@ -1,5 +1,5 @@
-import type { ChangeType } from '../../types/agent-types.js'
-import type { FileDiff } from './file-diff.js'
+import type { ChangeType } from '../../types/agent-types.ts'
+import type { FileDiff } from './file-diff.ts'
 
 export interface DiffResult {
   commitHash?: string

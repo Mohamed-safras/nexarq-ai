@@ -1,3 +1,3 @@
-export * from './agent-types.js'
-export * from './event-types.js'
-export * from './error-types.js'
+export * from './agent-types.ts'
+export * from './event-types.ts'
+export * from './error-types.ts'

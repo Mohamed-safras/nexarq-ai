@@ -10,7 +10,7 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
 
 export const DEFAULT_TIER1_AGENTS = ['security', 'secrets', 'bugs'] as const
 
-export const DEFAULT_MAX_AGENTS = 12
+export const DEFAULT_MAX_AGENTS = 6
 
 export const DEFAULT_TOOL_CALL_BUDGET = 25
 

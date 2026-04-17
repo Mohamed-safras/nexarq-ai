@@ -1,4 +1,4 @@
-import type { RunConfig } from '../agent/run-config.js'
+import type { RunConfig } from '../agent/run-config.ts'
 
 export interface RunRequest {
   diff?: string

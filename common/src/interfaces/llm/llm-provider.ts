@@ -1,5 +1,5 @@
-import type { LLMRequest } from './llm-request.js'
-import type { LLMResponse } from './llm-response.js'
+import type { LLMRequest } from './llm-request.ts'
+import type { LLMResponse } from './llm-response.ts'
 
 export interface ILLMProvider {
   name: string
