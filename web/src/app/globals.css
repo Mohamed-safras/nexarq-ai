@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+:root {
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+body {
+  font-family: var(--font-mono);
+}
