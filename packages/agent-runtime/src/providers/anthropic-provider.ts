@@ -11,7 +11,7 @@ export class AnthropicProvider implements IProvider {
       model: config?.model ?? this.defaultModel,
       temperature: config?.temperature ?? 0.2,
       maxTokens: config?.maxTokens ?? 4096,
-      apiKey: process.env['NEXARQ_ANTHROPIC_API_KEY'],
+      ...(process.env['NEXARQ_ANTHROPIC_API_KEY'] ? { apiKey: process.env['NEXARQ_ANTHROPIC_API_KEY'] } : {}),
     })
   }
 

@@ -1,38 +1,32 @@
 import { StateGraph, END, START } from '@langchain/langgraph'
-import type { NexarqGraphState } from './state.ts'
-import { GRAPH_STATE_DEFAULTS } from './state.ts'
+import type { NexarqGraphState, WorkflowSubtask } from './state.ts'
+import { buildStateChannels } from './state.ts'
+
 import { runReviewAgentNode } from './nodes/review-node.ts'
-import { runCodingAgentNode } from './nodes/coding-agent-node.ts'
 import { runSummaryNode } from './nodes/summary-node.ts'
+import { runTriageNode } from './nodes/triage-node.ts'
+import { runArchitectNode } from './nodes/workflow/architect-node.ts'
+import { runCoderNode } from './nodes/workflow/coder-node.ts'
+import { runTesterNode } from './nodes/workflow/tester-node.ts'
+import { runReviewerNode } from './nodes/workflow/reviewer-node.ts'
 import type { AgentSelectionPlan } from '../selector.ts'
 
-const ROUTER_NODE = 'router'
-const CODING_AGENT_NODE = 'coding_agent'
-const SUMMARY_NODE = 'summary'
+// ── Review graph ─────────────────────────────────────────────────────────────
 
 /**
- * Builds and compiles the Nexarq LangGraph graph.
- *
- * Graph topology:
- *
- *   START → router ─┬─(coding-agent)──→ coding_agent → END
- *                   └─(review)─→ [agent nodes in parallel] → summary → END
- *
- * The graph is the same regardless of trigger source — the router node
- * reads `triggerSource` from state and directs to the correct path.
+ * Review graph topology:
+ *   START → router → [review_agent_1 … review_agent_N in parallel] → summary → END
  */
 export function buildNexarqGraph(plan: AgentSelectionPlan) {
-  const graph = new StateGraph<NexarqGraphState>({
-    channels: buildStateChannels(),
-  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graph = new StateGraph<NexarqGraphState>({ channels: buildStateChannels() } as any) as any
 
-  // Router — decides which path to take
+  const ROUTER_NODE  = 'router'
+  const TRIAGE_NODE  = 'triage'
+  const SUMMARY_NODE = 'summary'
+
   graph.addNode(ROUTER_NODE, (state: NexarqGraphState) => state)
 
-  // Coding-agent path
-  graph.addNode(CODING_AGENT_NODE, runCodingAgentNode)
-
-  // Review-agent nodes — one node per selected agent
   const reviewNodeNames: string[] = []
   for (const agentDef of plan.allSelectedAgents) {
     const nodeName = `review_${agentDef.name}`
@@ -42,56 +36,63 @@ export function buildNexarqGraph(plan: AgentSelectionPlan) {
     )
   }
 
-  // Summary node — assembles all review results
+  graph.addNode(TRIAGE_NODE, runTriageNode)
   graph.addNode(SUMMARY_NODE, runSummaryNode)
 
-  // Edges
   graph.addEdge(START, ROUTER_NODE)
-
   graph.addConditionalEdges(
     ROUTER_NODE,
-    routeByTrigger,
-    {
-      coding_agent: CODING_AGENT_NODE,
-      review: reviewNodeNames.length > 0 ? reviewNodeNames[0]! : SUMMARY_NODE,
-    }
+    (_state: NexarqGraphState): string | string[] =>
+      reviewNodeNames.length > 0 ? reviewNodeNames : TRIAGE_NODE
   )
-
-  // Fan-out: all review nodes run, then converge at summary
   for (const nodeName of reviewNodeNames) {
-    graph.addEdge(nodeName, SUMMARY_NODE)
+    graph.addEdge(nodeName, TRIAGE_NODE)
   }
-
-  graph.addEdge(CODING_AGENT_NODE, END)
+  graph.addEdge(TRIAGE_NODE, SUMMARY_NODE)
   graph.addEdge(SUMMARY_NODE, END)
 
   return graph.compile()
 }
 
-function routeByTrigger(state: NexarqGraphState): 'coding_agent' | 'review' {
-  return state.triggerSource === 'coding-agent' ? 'coding_agent' : 'review'
-}
+// ── Coding graph ─────────────────────────────────────────────────────────────
 
-function buildStateChannels(): Record<string, unknown> {
-  // LangGraph channel definition — each key maps to a reducer or default value.
-  // Arrays use append-reducer; primitives use last-write-wins.
-  return {
-    task:                   { default: () => '' },
-    triggerSource:          { default: () => 'on-demand' },
-    diffResult:             { default: () => undefined },
-    runConfig:              { default: () => ({}) },
-    messages:               { reducer: (existing: unknown[], incoming: unknown[]) => [...existing, ...incoming], default: () => [] },
-    dispatchedAgents:       { reducer: (existing: string[], incoming: string[]) => [...existing, ...incoming], default: () => [] },
-    agentResults:           { reducer: (existing: unknown[], incoming: unknown[]) => [...existing, ...incoming], default: () => [] },
-    hasHighSeverityFinding: { default: () => false },
-    toolCallCount:          { default: () => 0 },
-    workingDirectory:       { default: () => undefined },
-    modifiedFiles:          { reducer: (existing: string[], incoming: string[]) => [...existing, ...incoming], default: () => [] },
-    finalOutput:            { default: () => '' },
-    isDone:                 { default: () => false },
-    errorMessage:           { default: () => undefined },
-    ...Object.fromEntries(
-      Object.entries(GRAPH_STATE_DEFAULTS).map(([key]) => [key, {}])
-    ),
+/**
+ * Coding graph topology:
+ *   START → architect → [coder_1 … coder_N in parallel] → tester → reviewer → END
+ *
+ * Subtask count is known before this is called (planner runs pre-graph),
+ * so the fan-out width is fixed at compile time.
+ */
+export function buildCodingGraph(subtasks: WorkflowSubtask[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graph = new StateGraph<NexarqGraphState>({ channels: buildStateChannels() } as any) as any
+
+  const ARCHITECT_NODE = 'architect'
+  const TESTER_NODE    = 'tester'
+  const REVIEWER_NODE  = 'reviewer'
+
+  graph.addNode(ARCHITECT_NODE, runArchitectNode)
+
+  const coderNodeNames: string[] = []
+  for (const subtask of subtasks) {
+    const nodeName = `coder_${subtask.id}`
+    coderNodeNames.push(nodeName)
+    graph.addNode(nodeName, (state: NexarqGraphState) => runCoderNode(state, subtask))
   }
+
+  graph.addNode(TESTER_NODE, runTesterNode)
+  graph.addNode(REVIEWER_NODE, runReviewerNode)
+
+  graph.addEdge(START, ARCHITECT_NODE)
+  graph.addConditionalEdges(
+    ARCHITECT_NODE,
+    (): string[] => coderNodeNames.length > 0 ? coderNodeNames : [TESTER_NODE]
+  )
+  for (const nodeName of coderNodeNames) {
+    graph.addEdge(nodeName, TESTER_NODE)
+  }
+  graph.addEdge(TESTER_NODE, REVIEWER_NODE)
+  graph.addEdge(REVIEWER_NODE, END)
+
+  return graph.compile()
 }

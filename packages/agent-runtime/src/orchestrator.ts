@@ -5,7 +5,7 @@ import { compareSeverity } from '@nexarq/common/utils'
 import { selectAgents, type TriggerSource } from './selector.ts'
 import { buildNexarqGraph } from './graph/graph.ts'
 import { GRAPH_STATE_DEFAULTS, type NexarqGraphState } from './graph/state.ts'
-import { withTracing } from './tracing/langsmith-tracer.ts'
+
 import { loadKnowledgeFile, formatKnowledgeBlock } from './knowledge.ts'
 
 export interface OrchestratorRunOptions {
@@ -59,15 +59,20 @@ export async function runOrchestrator(
   const resolvedMode: AgentMode = runConfig.mode ?? DEFAULT_MODE
 
   const selectionPlan = selectAgents({
-    diffResult,
+    ...(diffResult ? { diffResult } : {}),
     mode: resolvedMode,
     triggerSource,
-    // Only pass requestedAgentNames when it is defined to satisfy exactOptionalPropertyTypes
     ...(runConfig.agents ? { requestedAgentNames: runConfig.agents } : {}),
     maxAgents: runConfig.maxAgents ?? DEFAULT_MAX_AGENTS,
   })
 
-  onEvent?.({ type: 'agent:start', agentName: 'orchestrator' })
+  const agentNames = selectionPlan.allSelectedAgents.map((agentDef) => agentDef.name)
+
+  // Announce the plan so the TUI can show all agents as pending before the graph starts
+  onEvent?.({ type: 'run:plan', agentNames })
+  for (const agentName of agentNames) {
+    onEvent?.({ type: 'agent:start', agentName })
+  }
 
   // Load project knowledge file — injected as context into every agent prompt
   const rawKnowledge = loadKnowledgeFile(workingDirectory)
@@ -81,20 +86,12 @@ export async function runOrchestrator(
     workingDirectory,
     ...(diffResult ? { diffResult } : {}),
     ...(knowledgeContext ? { knowledgeContext } : {}),
+    ...(onEvent ? { onEvent } : {}),
   }
 
   const graph = buildNexarqGraph(selectionPlan)
 
-  const tracedInvoke = withTracing(
-    async (state: NexarqGraphState) => graph.invoke(state),
-    {
-      name: 'nexarq.orchestrator',
-      triggerSource,
-      agentNames: selectionPlan.allSelectedAgents.map((agentDef) => agentDef.name),
-    }
-  )
-
-  const finalState = await tracedInvoke(initialState)
+  const finalState = await graph.invoke(initialState)
 
   const durationMs = Date.now() - startTime
   const sortedResults = [...finalState.agentResults].sort((resultA, resultB) =>
@@ -103,9 +100,6 @@ export async function runOrchestrator(
 
   const summary = buildSummary(sortedResults)
 
-  for (const agentResult of sortedResults) {
-    onEvent?.({ type: 'agent:complete', result: agentResult })
-  }
   onEvent?.({ type: 'run:complete', results: sortedResults, durationMs })
 
   return {

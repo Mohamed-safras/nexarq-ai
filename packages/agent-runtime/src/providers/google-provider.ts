@@ -11,7 +11,7 @@ export class GoogleProvider implements IProvider {
       model: config?.model ?? this.defaultModel,
       temperature: config?.temperature ?? 0.2,
       maxOutputTokens: config?.maxTokens ?? 4096,
-      apiKey: process.env['NEXARQ_GOOGLE_API_KEY'],
+      ...(process.env['NEXARQ_GOOGLE_API_KEY'] ? { apiKey: process.env['NEXARQ_GOOGLE_API_KEY'] } : {}),
     })
   }
 

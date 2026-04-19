@@ -1,15 +1,24 @@
-import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { isHighPriority } from '@nexarq/common/utils'
-import type { AgentResult } from '@nexarq/common/types'
+import type { AgentResult } from '@nexarq/common/interfaces'
 import type { NexarqGraphState } from '../state.ts'
 import { getAgent } from '../../registry.ts'
-import { getProvider } from '../../providers/provider-factory.ts'
-import type { ProviderName } from '@nexarq/common/types'
+import { MODE_MAX_DIFF_TOKENS, MODE_MAX_OUTPUT_TOKENS } from '@nexarq/common/constants'
+import { runReactAgent, runThinkingAgent, fireComplete } from './workflow/node-utils.ts'
+import { getReadTools } from '../../tools/index.ts'
+
+function truncateDiff(rawDiff: string, maxTokens: number): string {
+  const maxChars = maxTokens * 4
+  if (rawDiff.length <= maxChars) return rawDiff
+  return rawDiff.slice(0, maxChars) + '\n\n[diff truncated for speed — use --mode deep for full analysis]'
+}
 
 /**
- * Runs a single named review agent and appends its result to graph state.
- * Each review agent gets its own node invocation — LangGraph fans them out
- * in parallel via the orchestrator's parallel edges.
+ * Runs a single named review agent as a ReAct loop with read-only tools.
+ * The agent receives the diff in its prompt and can explore the codebase
+ * for context before producing its findings.
+ *
+ * Each agent gets its own node invocation — LangGraph fans them out in
+ * parallel via the orchestrator's conditional edges.
  */
 export async function runReviewAgentNode(
   state: NexarqGraphState,
@@ -17,71 +26,65 @@ export async function runReviewAgentNode(
 ): Promise<Partial<NexarqGraphState>> {
   const agentDefinition = getAgent(agentName)
   if (!agentDefinition) {
-    return {
-      agentResults: [
-        ...state.agentResults,
-        buildErrorResult(agentName, `Agent "${agentName}" not found in registry`),
-      ],
-    }
+    return { agentResults: [...state.agentResults, buildErrorResult(agentName, `Agent "${agentName}" not found in registry`)] }
   }
 
   const diffResult = state.diffResult
   if (!diffResult) {
-    return {
-      agentResults: [
-        ...state.agentResults,
-        buildErrorResult(agentName, 'No diff result available for review agent'),
-      ],
-    }
+    return { agentResults: [...state.agentResults, buildErrorResult(agentName, 'No diff result available')] }
   }
 
-  const providerName = (state.runConfig.provider ?? 'ollama') as ProviderName
-  const provider = getProvider(providerName)
-  const chatModel = provider.buildModel({
-    model: state.runConfig.model,
-    temperature: 0.2,
-    maxTokens: 4096,
-  })
+  const mode            = state.runConfig.mode ?? 'smart'
+  const maxDiffTokens   = MODE_MAX_DIFF_TOKENS[mode]
+  const maxOutputTokens = MODE_MAX_OUTPUT_TOKENS[mode]
 
-  const userPrompt = agentDefinition.buildPrompt(
-    diffResult.rawDiff,
-    diffResult.primaryLanguage
-  )
+  const truncatedDiff = truncateDiff(diffResult.rawDiff, maxDiffTokens)
+  const userPrompt    = agentDefinition.buildPrompt(truncatedDiff, diffResult.primaryLanguage)
+
+  const workingDirectory = state.workingDirectory ?? process.cwd()
+  const tools            = getReadTools(workingDirectory)
 
   const startTime = Date.now()
+  state.onEvent?.({ type: 'agent:start', agentName })
 
   try {
-    const response = await (chatModel as { invoke: (msgs: unknown[]) => Promise<{ content: string }> }).invoke([
-      new SystemMessage(agentDefinition.systemPrompt),
-      new HumanMessage(userPrompt),
-    ])
+    const runAgent = agentDefinition.usesExtendedThinking ? runThinkingAgent : runReactAgent
+    const output = await runAgent(
+      state.runConfig,
+      agentDefinition.systemPrompt,
+      userPrompt,
+      tools,
+      { temperature: 0.2, maxTokens: maxOutputTokens }
+    )
+
+    const findings = agentDefinition.parseFindingsFromOutput?.(output) ?? []
 
     const agentResult: AgentResult = {
       agentName,
-      severity: agentDefinition.severity,
-      output: response.content,
-      findings: [],
-      warnings: [],
+      severity:   agentDefinition.severity,
+      output,
+      findings,
+      warnings:   [],
       tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-      latencyMs: Date.now() - startTime,
-      cached: false,
+      latencyMs:  Date.now() - startTime,
+      cached:     false,
     }
 
-    const updatedResults = [...state.agentResults, agentResult]
-    const hasHighSeverity = updatedResults.some((result) => isHighPriority(result.severity))
+    fireComplete(state.onEvent, agentName, output, Date.now() - startTime)
+
+    const updatedResults  = [...state.agentResults, agentResult]
+    const hasHighSeverity = updatedResults.some((r) => isHighPriority(r.severity))
 
     return {
-      agentResults: updatedResults,
-      dispatchedAgents: [...state.dispatchedAgents, agentName],
+      agentResults:           updatedResults,
+      dispatchedAgents:       [...state.dispatchedAgents, agentName],
       hasHighSeverityFinding: hasHighSeverity,
     }
-  } catch (caughtError) {
-    const errorMessage = caughtError instanceof Error ? caughtError.message : String(caughtError)
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    state.onEvent?.({ type: 'agent:error', agentName, error: errorMessage })
     return {
-      agentResults: [
-        ...state.agentResults,
-        buildErrorResult(agentName, errorMessage),
-      ],
+      agentResults:     [...state.agentResults, buildErrorResult(agentName, errorMessage)],
       dispatchedAgents: [...state.dispatchedAgents, agentName],
     }
   }
@@ -90,13 +93,13 @@ export async function runReviewAgentNode(
 function buildErrorResult(agentName: string, errorMessage: string): AgentResult {
   return {
     agentName,
-    severity: 'info',
-    output: '',
-    findings: [],
-    warnings: [],
+    severity:   'info',
+    output:     '',
+    findings:   [],
+    warnings:   [],
     tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    latencyMs: 0,
-    cached: false,
-    error: errorMessage,
+    latencyMs:  0,
+    cached:     false,
+    error:      errorMessage,
   }
 }

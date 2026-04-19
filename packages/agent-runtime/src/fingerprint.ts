@@ -5,14 +5,14 @@ import type { AgentFinding } from '@nexarq/common/interfaces'
  * reported on every commit. The fingerprint is based on:
  *   - agent name (who found it)
  *   - severity
- *   - title (normalised — stripped of line numbers / hashes)
+ *   - message (normalised — stripped of line numbers / hashes)
  *   - file path (if present)
  *
  * We intentionally exclude the full description and line number so the
  * fingerprint survives minor diffs / reformats.
  */
 export function fingerprintFinding(agentName: string, finding: AgentFinding): string {
-  const normalisedTitle = finding.title
+  const normalisedTitle = (finding.message ?? '')
     .replace(/\b\d+\b/g, '')   // strip bare numbers (line refs)
     .replace(/\s+/g, ' ')
     .trim()

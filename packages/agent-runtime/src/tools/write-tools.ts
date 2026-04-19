@@ -5,7 +5,7 @@ import { resolve, dirname } from 'path'
 import { execSync } from 'child_process'
 
 const MAX_WRITE_SIZE_BYTES = 500_000
-const COMMAND_TIMEOUT_MS = 60_000
+const COMMAND_TIMEOUT_MS   = 60_000
 
 /**
  * Prefix-based allowlist — command must START WITH one of these strings.
@@ -29,22 +29,18 @@ const ALLOWED_COMMAND_PREFIXES: readonly string[] = [
   // Build
   'npm run build', 'bun run build',
   'go build', 'cargo build',
-  // Safe read-only git commands
-  'git status', 'git log', 'git diff', 'git show', 'git branch',
 ]
 
 function isCommandAllowed(command: string): boolean {
-  const trimmedCommand = command.trim()
-  return ALLOWED_COMMAND_PREFIXES.some((allowedPrefix) =>
-    trimmedCommand.startsWith(allowedPrefix)
-  )
+  const trimmed = command.trim()
+  return ALLOWED_COMMAND_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
 }
 
 /**
- * Read-write tools available ONLY to the coding-agent node.
- * Review agents receive only the read-only tools from review-tools.ts.
+ * Write and execute tools available only to coding agents (coder + tester nodes).
+ * Review and architect agents receive only the read tools from read-tools.ts.
  */
-export function getCodingTools(workingDirectory: string) {
+export function getWriteTools(workingDirectory: string) {
   const safeResolve = (filePath: string): string => {
     const absolutePath = resolve(workingDirectory, filePath)
     if (!absolutePath.startsWith(resolve(workingDirectory))) {
@@ -61,10 +57,9 @@ export function getCodingTools(workingDirectory: string) {
         return `[BLOCKED] Content exceeds the ${MAX_WRITE_SIZE_BYTES}-byte limit.`
       }
 
-      // Always back up the existing file before overwriting
       if (existsSync(absolutePath)) {
-        const existingContent = readFileSync(absolutePath, 'utf-8')
-        writeFileSync(`${absolutePath}.nexarq-backup`, existingContent, 'utf-8')
+        const existing = readFileSync(absolutePath, 'utf-8')
+        writeFileSync(`${absolutePath}.nexarq-backup`, existing, 'utf-8')
       }
 
       mkdirSync(dirname(absolutePath), { recursive: true })
@@ -100,16 +95,9 @@ export function getCodingTools(workingDirectory: string) {
           timeout: COMMAND_TIMEOUT_MS,
         })
         return output.trim() || '(command completed with no output)'
-      } catch (caughtError) {
-        const errorDetails = caughtError as {
-          stdout?: string
-          stderr?: string
-          message?: string
-        }
-        return [errorDetails.stdout, errorDetails.stderr, errorDetails.message]
-          .filter(Boolean)
-          .join('\n')
-          .trim()
+      } catch (err) {
+        const e = err as { stdout?: string; stderr?: string; message?: string }
+        return [e.stdout, e.stderr, e.message].filter(Boolean).join('\n').trim()
       }
     },
     {
@@ -117,54 +105,9 @@ export function getCodingTools(workingDirectory: string) {
       description:
         'Run an allowed shell command such as a test runner or linter. ' +
         'Arbitrary shell commands are blocked for safety.',
-      schema: z.object({
-        command: z.string().describe('The command to execute'),
-      }),
+      schema: z.object({ command: z.string().describe('The command to execute') }),
     }
   )
 
-  const gitDiffTool = tool(
-    async ({ target }: { target?: string }): Promise<string> => {
-      try {
-        const diffTarget = target ?? 'HEAD'
-        const output = execSync(`git diff ${diffTarget}`, {
-          cwd: workingDirectory,
-          encoding: 'utf-8',
-          timeout: 5_000,
-        })
-        return output.trim() || '(no changes)'
-      } catch {
-        return 'Unable to read git diff.'
-      }
-    },
-    {
-      name: 'git_diff',
-      description: 'Show the current working-tree diff against HEAD or another ref.',
-      schema: z.object({
-        target: z.string().optional().describe('Git ref to diff against (default: HEAD)'),
-      }),
-    }
-  )
-
-  const gitStatusTool = tool(
-    async (): Promise<string> => {
-      try {
-        const output = execSync('git status --short', {
-          cwd: workingDirectory,
-          encoding: 'utf-8',
-          timeout: 5_000,
-        })
-        return output.trim() || '(working tree clean)'
-      } catch {
-        return 'Unable to read git status.'
-      }
-    },
-    {
-      name: 'git_status',
-      description: 'Show the current working tree status (modified, untracked files).',
-      schema: z.object({}),
-    }
-  )
-
-  return [writeFileTool, runCommandTool, gitDiffTool, gitStatusTool]
+  return [writeFileTool, runCommandTool]
 }

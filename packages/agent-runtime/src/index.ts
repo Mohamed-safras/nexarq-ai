@@ -1,4 +1,7 @@
 export * from './orchestrator.ts'
+export * from './workflow-orchestrator.ts'
+export * from './conversation-orchestrator.ts'
+export * from './session-store.ts'
 export * from './registry.ts'
 export * from './selector.ts'
 export * from './providers/index.ts'

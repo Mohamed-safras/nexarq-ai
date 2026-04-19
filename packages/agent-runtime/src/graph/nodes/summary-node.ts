@@ -37,6 +37,10 @@ export function runSummaryNode(state: NexarqGraphState): Partial<NexarqGraphStat
       .map((result) => `[${result.severity.toUpperCase()}] ${result.agentName}\n${result.output}`),
   ]
 
+  if (state.triageOutput && state.triageOutput.trim().length > 0) {
+    outputLines.push('', '[TRIAGE] Cross-validation', state.triageOutput)
+  }
+
   return {
     finalOutput: outputLines.join('\n'),
     isDone: true,
