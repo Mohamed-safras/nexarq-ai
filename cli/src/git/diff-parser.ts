@@ -67,11 +67,11 @@ function primaryLanguage(files: FileDiff[]): string {
     const lines = f.addedLines.length + f.removedLines.length
     counts.set(f.language, (counts.get(f.language) ?? 0) + lines)
   }
-  let best = 'unknown', bestCount = 0
+  let topLanguage = 'unknown', topLineCount = 0
   for (const [lang, count] of counts) {
-    if (count > bestCount) { best = lang; bestCount = count }
+    if (count > topLineCount) { topLanguage = lang; topLineCount = count }
   }
-  return best
+  return topLanguage
 }
 
 // ── Git diff parser ───────────────────────────────────────────────────────────

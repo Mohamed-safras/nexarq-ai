@@ -49,12 +49,16 @@ function getCliSourceDir(): string {
 }
 
 function getBunPath(): string {
-  try {
-    const found = execSync('which bun || where bun', { encoding: 'utf-8' }).trim().split('\n')[0] ?? ''
-    return found
-  } catch {
-    return 'bun'
+  const cmds = process.platform === 'win32'
+    ? ['where.exe bun']
+    : ['which bun', 'command -v bun']
+  for (const cmd of cmds) {
+    try {
+      const found = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().split('\n')[0]
+      if (found) return found
+    } catch { /* try next */ }
   }
+  return 'bun'
 }
 
 export async function installHook(hookType: 'post-commit' | 'pre-push'): Promise<void> {

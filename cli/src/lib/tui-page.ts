@@ -1,9 +1,11 @@
 import { createCliRenderer, Box, Text, ScrollBox } from '@opentui/core'
 import type { CliRenderer, StyledText } from '@opentui/core'
-import { THEME } from '../output/tui/theme.ts'
+import { getThemeByVariant, type NexarqTheme } from '../output/tui/theme.ts'
+import { loadConfig } from '../config/config-loader.ts'
 
 export interface PageTUI {
   renderer: CliRenderer
+  theme: NexarqTheme
   /** ScrollBox node — append Text children here */
   body: { add(child: unknown): void }
   /** Remove all children from the body scroll area */
@@ -16,44 +18,46 @@ export interface PageTUI {
   waitForConfirm(): Promise<boolean>
   /**
    * Run an async operation; on throw: destroy renderer, print error, exit(1).
-   * Returns the resolved value on success.
    */
   withError<T>(fn: () => Promise<T>): Promise<T>
 }
 
 /**
- * Creates a standard 3-panel full-screen TUI layout:
+ * Creates a standard 3-panel full-screen TUI layout.
+ * Loads the user's saved theme from config automatically.
  *
- *   ┌─ header (bgAlt) ──────────────────────────────────────┐
- *   │  NEXARQ <TITLE>                                        │
- *   ├─ body panel (bordered, flex-grow) ────────────────────┤
- *   │  <scrollable content area>                            │
- *   ├─ footer (bgAlt) ──────────────────────────────────────┤
- *   │  <status text>                                        │
- *   └────────────────────────────────────────────────────────┘
+ *   ┌─ header (bgAlt) ───────────────────────────────────────┐
+ *   │  NEXARQ <TITLE>                                         │
+ *   ├─ body panel (bordered, flex-grow) ─────────────────────┤
+ *   │  <scrollable content area>                             │
+ *   ├─ footer (bgAlt) ───────────────────────────────────────┤
+ *   │  <status text>                                         │
+ *   └─────────────────────────────────────────────────────────┘
  */
 export async function createPageTUI(
   title: string,
   bodyTitle = '',
   opts: { exitOnCtrlC?: boolean } = {},
 ): Promise<PageTUI> {
+  const config   = await loadConfig()
+  const theme    = getThemeByVariant(config.theme ?? 'dark')
   const renderer = await createCliRenderer({ exitOnCtrlC: opts.exitOnCtrlC ?? false })
 
-  const body = ScrollBox({ width: '100%', flexGrow: 1, flexDirection: 'column' })
-  const status = Text({ content: '', fg: THEME.fgDim })
+  const body   = ScrollBox({ width: '100%', flexGrow: 1, flexDirection: 'column' })
+  const status = Text({ content: '', fg: theme.fgDim })
 
   renderer.root.add(
     Box(
-      { width: '100%', height: '100%', flexDirection: 'column', backgroundColor: THEME.bg },
+      { width: '100%', height: '100%', flexDirection: 'column', backgroundColor: theme.bg },
       Box(
-        { width: '100%', backgroundColor: THEME.bgAlt },
-        Text({ content: `  NEXARQ ${title}`, fg: THEME.cyan }),
+        { width: '100%', backgroundColor: theme.bgAlt },
+        Text({ content: `  NEXARQ ${title}`, fg: theme.cyan }),
       ),
       Box(
-        { flexGrow: 1, border: true, borderColor: THEME.fgDim, title: bodyTitle ? ` ${bodyTitle} ` : '' },
+        { flexGrow: 1, border: true, borderColor: theme.fgDim, title: bodyTitle ? ` ${bodyTitle} ` : '' },
         body,
       ),
-      Box({ width: '100%', backgroundColor: THEME.bgAlt }, status),
+      Box({ width: '100%', backgroundColor: theme.bgAlt }, status),
     ),
   )
 
@@ -90,5 +94,5 @@ export async function createPageTUI(
     }
   }
 
-  return { renderer, body, status, waitForKey, waitForConfirm, withError, clearBody }
+  return { renderer, theme, body, status, waitForKey, waitForConfirm, withError, clearBody }
 }

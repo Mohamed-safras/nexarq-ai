@@ -18,6 +18,8 @@ export interface NexarqConfig {
   theme?: ThemeVariant
   /** Whether nexarq auto-runs after every commit/push. Default true. */
   autoRun?: boolean
+  /** Allow unrestricted shell commands (install, migrate, deploy). Default false. */
+  unsafeShell?: boolean
 }
 
 const DEFAULT_CONFIG: NexarqConfig = {
