@@ -1,0 +1,19 @@
+{
+  "name": "nexarq-action",
+  "version": "0.1.0",
+  "description": "Nexarq AI code review GitHub Action",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target node --format cjs --bundle",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexarq/common": "workspace:*",
+    "@nexarq/agent-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
