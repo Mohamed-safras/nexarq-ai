@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on memory safety and resource leak issues in this diff.
 
@@ -18,7 +18,11 @@ export const memorySafetyAgent: AgentDefinition = {
   description: 'Buffer overflows, use-after-free, and resource leak patterns',
   severity: 'high',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['bugfix', 'performance'],
+    diffContent: ['malloc', 'free(', 'delete ', 'heap', 'buffer', 'unsafe', 'ptr', 'raw pointer'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

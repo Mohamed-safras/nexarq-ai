@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on test coverage gaps in this diff.
 
@@ -18,7 +18,11 @@ export const testCoverageAgent: AgentDefinition = {
   description: 'Missing test cases for new logic, edge cases, and error paths',
   severity: 'medium',
   tier: 2,
-  needsTools: true,
+  selectionHints: {
+    changeTypes: ['feature', 'test', 'bugfix'],
+    filePaths: ['.test.', '.spec.', '__tests__', '/test/', '/tests/'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

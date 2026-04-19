@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on hardcoded secrets and credentials in this diff.
 
@@ -20,7 +20,7 @@ export const secretsAgent: AgentDefinition = {
   description: 'Hardcoded credentials, API keys, tokens, and private keys',
   severity: 'critical',
   tier: 1,
-  needsTools: false,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

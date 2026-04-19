@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on resource management issues in this diff.
 
@@ -18,7 +18,11 @@ export const resourceUsageAgent: AgentDefinition = {
   description: 'File handles, connections, timers, and listeners not properly released',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['performance', 'feature'],
+    diffContent: ['setInterval', 'setTimeout', 'addEventListener', 'createReadStream', 'createWriteStream', 'fs.open', 'pool'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

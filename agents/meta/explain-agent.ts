@@ -18,7 +18,6 @@ export const explainAgent: AgentDefinition = {
   description: 'Plain-English walkthrough of what the diff does and why',
   severity: 'info',
   tier: 2,
-  needsTools: false,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
 }

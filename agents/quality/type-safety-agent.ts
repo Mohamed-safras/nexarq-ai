@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on type safety issues in this diff.
 
@@ -18,7 +18,11 @@ export const typeSafetyAgent: AgentDefinition = {
   description: "Missing annotations, unsafe 'any' usage, and type assertion abuse",
   severity: 'low',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['feature', 'refactor'],
+    diffContent: ['any', 'as unknown', 'as any', '@ts-ignore', '@ts-nocheck'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

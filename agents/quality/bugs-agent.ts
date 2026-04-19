@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on logic errors, bugs, and incorrect behavior in this diff.
 
@@ -19,7 +19,7 @@ export const bugsAgent: AgentDefinition = {
   description: 'Logic errors, null dereferences, async issues, and incorrect behavior',
   severity: 'high',
   tier: 1,
-  needsTools: true,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on concurrency and thread-safety issues in this diff.
 
@@ -18,7 +18,10 @@ export const concurrencyAgent: AgentDefinition = {
   description: 'Race conditions, deadlocks, thread safety, and async correctness',
   severity: 'high',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    diffContent: ['async ', 'await ', 'thread', 'mutex', 'semaphore', 'Promise.all', 'Promise.race', 'concurrent'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

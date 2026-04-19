@@ -25,7 +25,6 @@ export const aiFixesAgent: AgentDefinition = {
   description: 'Generates concrete code fix suggestions for CRITICAL and HIGH findings',
   severity: 'info',
   tier: 2,
-  needsTools: false,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
 }

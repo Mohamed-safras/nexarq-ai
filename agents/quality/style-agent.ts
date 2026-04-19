@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on code style and formatting consistency in this diff.
 
@@ -20,7 +20,10 @@ export const styleAgent: AgentDefinition = {
   description: 'Naming conventions, formatting consistency, and import ordering',
   severity: 'low',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['refactor', 'feature', 'general'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

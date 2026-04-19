@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on documentation and comment quality in this diff.
 
@@ -18,7 +18,11 @@ export const docstringAgent: AgentDefinition = {
   description: 'Missing JSDoc, outdated comments, and undocumented public APIs',
   severity: 'low',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['feature', 'docs'],
+    diffContent: ['export function', 'export class', 'export interface', 'export type', 'export const', 'public '],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

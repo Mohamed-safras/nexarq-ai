@@ -27,7 +27,6 @@ export const nextStepsAgent: AgentDefinition = {
   description: 'Prioritised action list of what to fix and improve',
   severity: 'info',
   tier: 2,
-  needsTools: false,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
 }

@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on compliance and regulatory concerns in this diff.
 
@@ -18,7 +18,11 @@ export const complianceAgent: AgentDefinition = {
   description: 'GDPR, HIPAA, PCI-DSS, and license compliance issues',
   severity: 'high',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['security', 'database'],
+    filePaths: ['auth', 'security', 'crypto', 'password', 'token', 'cookie', 'gdpr', 'consent'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

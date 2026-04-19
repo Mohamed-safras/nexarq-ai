@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on accessibility (a11y) issues in this diff.
 
@@ -19,7 +19,12 @@ export const accessibilityAgent: AgentDefinition = {
   description: 'WCAG 2.1 violations, missing ARIA labels, keyboard navigation issues',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['docs', 'feature'],
+    filePaths: ['.css', '.scss', '.html', '.jsx', '.tsx', '.vue', 'aria'],
+    diffContent: ['<button', '<input', '<img', '<a href', 'onClick', 'role='],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

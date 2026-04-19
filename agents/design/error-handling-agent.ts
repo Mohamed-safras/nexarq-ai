@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on error handling patterns in this diff.
 
@@ -19,7 +19,11 @@ export const errorHandlingAgent: AgentDefinition = {
   description: 'Silent failures, swallowed exceptions, missing propagation',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['bugfix', 'feature'],
+    diffContent: ['catch', 'try {', '.catch(', 'throw ', 'reject('],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

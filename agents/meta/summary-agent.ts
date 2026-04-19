@@ -26,7 +26,9 @@ export const summaryAgent: AgentDefinition = {
   description: 'Executive summary of all findings with merge recommendation',
   severity: 'info',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    minDiffLines: 200,
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
 }

@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on database and data-layer concerns in this diff.
 
@@ -19,7 +19,11 @@ export const databaseAgent: AgentDefinition = {
   description: 'SQL injection, schema safety, missing indexes, and migration issues',
   severity: 'high',
   tier: 2,
-  needsTools: true,
+  selectionHints: {
+    changeTypes: ['database'],
+    filePaths: ['migration', 'schema', 'query', 'model', 'repository', 'prisma', 'drizzle'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

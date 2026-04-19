@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "paths": {
+      "@nexarq/common": ["../common/src/index.ts"],
+      "@nexarq/common/interfaces": ["../common/src/interfaces/index.ts"],
+      "@nexarq/common/interfaces/*": ["../common/src/interfaces/*.ts"],
+      "@nexarq/common/types": ["../common/src/types/index.ts"],
+      "@nexarq/common/constants": ["../common/src/constants/index.ts"],
+      "@nexarq/common/utils": ["../common/src/utils/index.ts"]
+    }
+  },
+  "include": ["."]
+}

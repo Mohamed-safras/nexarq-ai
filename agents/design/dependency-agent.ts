@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on dependency and package management concerns in this diff.
 
@@ -18,7 +18,10 @@ export const dependencyAgent: AgentDefinition = {
   description: 'Vulnerable packages, broad version ranges, and dependency hygiene',
   severity: 'high',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    filePaths: ['package.json', 'package-lock.json', 'yarn.lock', 'bun.lockb', 'go.mod', 'go.sum', 'requirements.txt', 'pyproject.toml', 'cargo.toml'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

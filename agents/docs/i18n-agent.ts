@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on internationalisation (i18n) issues in this diff.
 
@@ -17,7 +17,11 @@ export const i18nAgent: AgentDefinition = {
   description: 'Hardcoded strings, locale-unaware formatters, and RTL issues',
   severity: 'low',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    filePaths: ['i18n', 'locale', 'translation', '/lang/', 'locales/'],
+    diffContent: ['t(\'', 't("', 'translate(', 'i18n.', 'intl.'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

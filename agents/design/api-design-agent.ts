@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on API design quality in this diff.
 
@@ -19,7 +19,10 @@ export const apiDesignAgent: AgentDefinition = {
   description: 'REST/GraphQL conventions, status codes, versioning, and response contracts',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    diffContent: ['route', 'endpoint', 'router.', 'app.get', 'app.post', 'app.put', 'app.delete', 'graphql', 'resolver'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

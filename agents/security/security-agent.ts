@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { buildUserPrompt, SHARED_SYSTEM_PREFIX } from '../agent-template'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on security vulnerabilities in this diff.
 
@@ -19,7 +19,7 @@ export const securityAgent: AgentDefinition = {
   description: 'OWASP Top 10, injection flaws, auth issues, and sensitive data exposure',
   severity: 'critical',
   tier: 1,
-  needsTools: true,
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Perform a general code quality review of this diff.
 
@@ -19,7 +19,10 @@ export const reviewAgent: AgentDefinition = {
   description: 'General code quality, naming, complexity, and best practices',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['feature', 'general'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

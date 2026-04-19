@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on maintainability concerns in this diff.
 
@@ -18,7 +18,10 @@ export const maintainabilityAgent: AgentDefinition = {
   description: 'Function length, cyclomatic complexity, and coupling issues',
   severity: 'medium',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['refactor', 'feature'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

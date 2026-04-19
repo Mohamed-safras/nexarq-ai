@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on project-specific coding standards in this diff.
 
@@ -19,7 +19,10 @@ export const standardsAgent: AgentDefinition = {
   description: 'Project-specific coding standards and convention adherence',
   severity: 'low',
   tier: 2,
-  needsTools: true,
+  selectionHints: {
+    changeTypes: ['feature', 'refactor', 'general'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

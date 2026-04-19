@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on performance issues introduced by this diff.
 
@@ -19,7 +19,11 @@ export const performanceAgent: AgentDefinition = {
   description: 'N+1 queries, unnecessary computation, blocking calls, inefficient structures',
   severity: 'high',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    changeTypes: ['performance', 'database'],
+    diffContent: ['for (', 'while (', 'forEach', '.map(', 'SELECT', 'findAll', 'findMany'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

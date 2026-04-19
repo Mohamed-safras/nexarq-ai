@@ -1,5 +1,5 @@
 import type { AgentDefinition } from '@nexarq/common/interfaces'
-import { SHARED_SYSTEM_PREFIX, buildUserPrompt } from '../agent-template.ts'
+import { SHARED_SYSTEM_PREFIX, buildUserPrompt, parseFindings } from '../agent-template.ts'
 
 const instructions = `Focus ONLY on architectural and design concerns in this diff.
 
@@ -18,7 +18,11 @@ export const architectureAgent: AgentDefinition = {
   description: 'SOLID principles, coupling, layering, and module boundaries',
   severity: 'medium',
   tier: 2,
-  needsTools: true,
+  selectionHints: {
+    changeTypes: ['refactor', 'feature'],
+    diffContent: ['import ', 'require(', 'from \'', 'from "'],
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
+  parseFindingsFromOutput: parseFindings,
 }

@@ -28,7 +28,9 @@ export const riskScoringAgent: AgentDefinition = {
   description: 'Overall risk assessment and deployment safety score',
   severity: 'info',
   tier: 2,
-  needsTools: false,
+  selectionHints: {
+    minDiffLines: 200,
+  },
   systemPrompt: SHARED_SYSTEM_PREFIX,
   buildPrompt: (diff, language, context) => buildUserPrompt(instructions, diff, language, context),
 }
