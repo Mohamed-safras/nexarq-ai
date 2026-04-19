@@ -2,7 +2,6 @@ import { Command } from 'commander'
 import { writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Text, Select } from '@opentui/core'
-import { THEME } from '../output/tui/theme.ts'
 import { printError } from '../output/formatter.ts'
 import { loadConfig } from '../config/config-loader.ts'
 import { extractDiff } from '../git/diff-extractor.ts'
@@ -67,7 +66,7 @@ export function fixCommand(): Command {
               fixes.push({ finding, patch: finding.suggestion, file: finding.file })
               tui.body.add(Text({
                 content: `  [${finding.severity?.toUpperCase() ?? 'INFO'}] ${finding.message}`,
-                fg: THEME.severity[(finding.severity ?? 'info') as keyof typeof THEME.severity] ?? THEME.fg,
+                fg: tui.theme.severity[(finding.severity ?? 'info') as keyof typeof tui.theme.severity] ?? tui.theme.fg,
               }))
             }
           }
@@ -97,12 +96,12 @@ export function fixCommand(): Command {
 
         const fixSelect = Select({
           options: selectOptions,
-          textColor:               THEME.fg,
-          backgroundColor:         THEME.bg,
-          focusedBackgroundColor:  THEME.bgAlt,
-          focusedTextColor:        THEME.cyan,
-          selectedBackgroundColor: THEME.green,
-          selectedTextColor:       THEME.bg,
+          textColor:               tui.theme.fg,
+          backgroundColor:         tui.theme.bg,
+          focusedBackgroundColor:  tui.theme.bgAlt,
+          focusedTextColor:        tui.theme.cyan,
+          selectedBackgroundColor: tui.theme.green,
+          selectedTextColor:       tui.theme.bg,
           wrapSelection:           true,
           showDescription:         true,
           width:                   '100%',

@@ -1,24 +1,8 @@
 import { Command } from 'commander'
 import { Input, Text } from '@opentui/core'
-import { THEME } from '../output/tui/theme.ts'
 import { loadConfig } from '../config/config-loader.ts'
 import { createPageTUI } from '../lib/tui-page.ts'
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
-
-/**
- * nexarq chat
- *
- * Persistent conversation about your codebase.
- * Each turn runs the explain agent with full chat history injected.
- * History is kept in-memory only — session ends on exit.
- *
- * Token cost: scales with conversation length.
- * Mitigation: history is summarised after 20 turns to keep context bounded.
- */
 export function chatCommand(): Command {
   return new Command('chat')
     .description('Chat with Nexarq about your codebase')
@@ -27,17 +11,22 @@ export function chatCommand(): Command {
       const config = await loadConfig()
       const workingDirectory = options.dir ?? process.cwd()
 
-      const tui = await createPageTUI('CHAT  ·  Ctrl+C to exit', 'CONVERSATION', { exitOnCtrlC: false })
-      const history: ChatMessage[] = []
+      const { runConversationTurn } = await import('@nexarq/agent-runtime')
+      const runConfig = {
+        provider: config.provider,
+        ...(config.model ? { model: config.model } : {}),
+        unsafeShell: config.unsafeShell ?? false,
+      }
 
-      // Add input row between body panel and status footer
+      const tui = await createPageTUI('CHAT  ·  Ctrl+C to exit', 'CONVERSATION', { exitOnCtrlC: false })
+      const { theme } = tui
+
       const inputBox = Input({
         placeholder: 'Ask about your code...',
         width: '100%',
-        textColor: THEME.fg,
-        backgroundColor: THEME.bgAlt,
+        textColor: theme.fg,
+        backgroundColor: theme.bgAlt,
       })
-      // Insert input above the status line (before the last child / footer)
       const rootNode = tui.renderer.root as unknown as {
         getChildren(): unknown[]
         add(child: unknown, index?: number): void
@@ -48,7 +37,7 @@ export function chatCommand(): Command {
       inputBox.focus()
 
       function appendMessage(role: 'user' | 'assistant', content: string): void {
-        const color = role === 'user' ? THEME.cyan : THEME.fg
+        const color  = role === 'user' ? theme.cyan : theme.fg
         const prefix = role === 'user' ? '  You: ' : '  Nexarq: '
         content.split('\n').forEach((line, index) => {
           tui.body.add(Text({
@@ -56,59 +45,37 @@ export function chatCommand(): Command {
             fg: color,
           }))
         })
-        tui.body.add(Text({ content: '', fg: THEME.fg }))
+        tui.body.add(Text({ content: '', fg: theme.fg }))
       }
 
       async function handleSubmit(userMessage: string): Promise<void> {
         if (!userMessage.trim()) return
 
-        history.push({ role: 'user', content: userMessage })
         appendMessage('user', userMessage)
         tui.status.content = '  Thinking...'
 
-        // Summarise history if it grows beyond 20 turns (token safety)
-        const historyContext = history.length > 20
-          ? `[Earlier conversation summarised]\n${history.slice(-6).map((msg) => `${msg.role}: ${msg.content}`).join('\n')}`
-          : history.slice(-10).map((msg) => `${msg.role}: ${msg.content}`).join('\n')
-
-        let reply = ''
         try {
-          const { runOrchestrator } = await import('@nexarq/agent-runtime')
-          const result = await runOrchestrator({
-            task: `You are a helpful code review assistant. Answer concisely.
-
-Chat history:
-${historyContext}
-
-User: ${userMessage}`,
-            triggerSource: 'on-demand',
+          const result = await runConversationTurn({
+            userMessage,
             workingDirectory,
-            runConfig: {
-              provider: config.provider,
-              ...(config.model ? { model: config.model } : {}),
-              mode: 'smart',
-              agents: ['explain'],
-            },
-            onEvent: (event) => {
-              if (event.type === 'agent:chunk') {
-                reply += event.text
-              }
-            },
+            runConfig,
           })
 
-          reply = result.finalOutput.trim() || reply.trim() || 'No response generated.'
+          appendMessage('assistant', result.response)
+
+          if (result.suggestedFollowups.length > 0) {
+            const hints = result.suggestedFollowups.slice(0, 3).map((s, i) => `${i + 1}. ${s}`).join('  ')
+            tui.body.add(Text({ content: `  → ${hints}`, fg: theme.fgDim }))
+            tui.body.add(Text({ content: '', fg: theme.fg }))
+          }
         } catch (error) {
-          reply = `Error: ${error instanceof Error ? error.message : String(error)}`
+          appendMessage('assistant', `Error: ${error instanceof Error ? error.message : String(error)}`)
         }
 
-        history.push({ role: 'assistant', content: reply })
-        appendMessage('assistant', reply)
         tui.status.content = '  Ready'
       }
 
-      inputBox.on('enter', (value: string) => {
-        void handleSubmit(value)
-      })
+      inputBox.on('enter', (value: string) => { void handleSubmit(value) })
 
       tui.renderer.keyInput.on('keypress', (event) => {
         if (event.ctrl && event.name === 'c') {
@@ -117,6 +84,6 @@ User: ${userMessage}`,
         }
       })
 
-      appendMessage('assistant', 'Hi! Ask me anything about your codebase. I can review diffs, explain code, or discuss findings.')
+      appendMessage('assistant', 'Hi! Ask me anything about your codebase — I can review, implement, explain, search docs, or browse the web.')
     })
 }

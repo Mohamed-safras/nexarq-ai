@@ -6,7 +6,8 @@ import { loadConfig } from '../config/config-loader.ts'
 import { printError } from '../output/formatter.ts'
 import { createSpinner } from '../output/spinner.ts'
 import { createRunTUI } from '../output/tui/run-tui.ts'
-import type { RunEvent, AgentResult } from '@nexarq/common/types'
+import { createTuiEventHandler } from '../output/tui/tui-event-handler.ts'
+import type { AgentResult } from '@nexarq/common/interfaces'
 import type { TriggerSource } from '@nexarq/agent-runtime'
 import { confirm } from '@inquirer/prompts'
 import chalk from 'chalk'
@@ -90,7 +91,7 @@ export function runCommand(): Command {
             provider: config.provider,
             ...(config.model ? { model: config.model } : {}),
           },
-          onEvent: (event: RunEvent) => {
+          onEvent: (event) => {
             if (event.type === 'agent:complete') {
               spinner!.text = `  ✓ ${event.result.agentName}`
             }
@@ -120,9 +121,7 @@ export function runCommand(): Command {
 
     // ── Interactive TUI mode ─────────────────────────────────────────────────
     const tui = await createRunTUI(rawDiff.split('\n').length)
-
-    let totalAgents = 0
-    let doneAgents  = 0
+    const { onEvent } = createTuiEventHandler(tui)
 
     try {
       const result = await runOrchestrator({
@@ -135,30 +134,7 @@ export function runCommand(): Command {
           provider: config.provider,
           ...(config.model ? { model: config.model } : {}),
         },
-        onEvent: (event: RunEvent) => {
-          if (event.type === 'run:plan') {
-            totalAgents = event.agentNames.length
-            tui.initAgents(event.agentNames)
-          }
-          if (event.type === 'agent:start') {
-            tui.setAgentStatus(event.agentName, 'running')
-          }
-          if (event.type === 'agent:chunk') {
-            tui.appendChunk(event.agentName, event.text)
-          }
-          if (event.type === 'agent:complete') {
-            doneAgents++
-            tui.setAgentStatus(event.result.agentName, event.result.error ? 'error' : 'done')
-            const findingLines = event.result.output.trim().split('\n').filter(Boolean)
-            if (findingLines.length > 0) {
-              tui.addFinding(event.result.agentName, event.result.severity, findingLines)
-            }
-            tui.updateFooter(doneAgents, totalAgents, {}, 0)
-          }
-          if (event.type === 'agent:error') {
-            tui.setAgentStatus(event.agentName, 'error')
-          }
-        },
+        onEvent,
       })
 
       tui.updateFooter(result.results.length, result.results.length, result.summary, result.summary.tokensUsed)
@@ -207,7 +183,8 @@ export function runCommand(): Command {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const SEV_COLOR: Record<string, chalk.Chalk> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SEV_COLOR: Record<string, any> = {
   critical: chalk.bold.red,
   high:     chalk.red,
   medium:   chalk.yellow,

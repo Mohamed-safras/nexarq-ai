@@ -2,21 +2,11 @@ import { Command } from 'commander'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Text } from '@opentui/core'
-import { THEME } from '../output/tui/theme.ts'
 import { printError } from '../output/formatter.ts'
 import { loadConfig } from '../config/config-loader.ts'
 import { createPageTUI } from '../lib/tui-page.ts'
 import { runOrchestrator } from '@nexarq/agent-runtime'
 
-/**
- * nexarq explain <file[:line]>
- *
- * Plain-English explanation of any file or line range.
- * Uses the explain agent with the full file content as context.
- *
- * Token cost: proportional to file size. Truncated at 300 lines (~4k tokens).
- * Uses fast model by default — explanations don't need deep reasoning.
- */
 export function explainCommand(): Command {
   return new Command('explain')
     .description('Explain any file or line range in plain English')
@@ -26,13 +16,12 @@ export function explainCommand(): Command {
       const config = await loadConfig()
       const workingDirectory = options.dir ?? process.cwd()
 
-      // Parse file:line or file:start-end
       const colonIndex = target.lastIndexOf(':')
-      let filePath = target
+      let filePath  = target
       let lineRange: string | null = null
 
       if (colonIndex !== -1 && !target.slice(colonIndex + 1).includes('/')) {
-        filePath = target.slice(0, colonIndex)
+        filePath  = target.slice(0, colonIndex)
         lineRange = target.slice(colonIndex + 1)
       }
 
@@ -44,7 +33,7 @@ export function explainCommand(): Command {
 
       const allLines = readFileSync(fullPath, 'utf-8').split('\n')
       let startLine = 1
-      let endLine = Math.min(allLines.length, 300)
+      let endLine   = Math.min(allLines.length, 300)
 
       if (lineRange) {
         const parts = lineRange.split('-')
@@ -58,17 +47,12 @@ export function explainCommand(): Command {
       const lineLabel = lineRange ? `:${startLine}-${endLine}` : ''
 
       const tui = await createPageTUI(`EXPLAIN  ·  ${filePath}${lineLabel}`, 'EXPLANATION')
+      const { theme } = tui
       tui.status.content = `  Explaining ${filePath}${lineLabel}...`
 
       await tui.withError(async () => {
         await runOrchestrator({
-          task: `Explain this code from ${filePath}${lineLabel} in plain English.
-Describe what it does, why it matters, any non-obvious logic, and potential risks.
-Be concise — assume a senior developer audience.
-
-\`\`\`
-${codeBlock}
-\`\`\``,
+          task: `Explain this code from ${filePath}${lineLabel} in plain English.\nDescribe what it does, why it matters, any non-obvious logic, and potential risks.\nBe concise — assume a senior developer audience.\n\n\`\`\`\n${codeBlock}\n\`\`\``,
           triggerSource: 'on-demand',
           workingDirectory,
           runConfig: {
@@ -79,7 +63,7 @@ ${codeBlock}
           },
           onEvent: (event) => {
             if (event.type === 'agent:chunk') {
-              tui.body.add(Text({ content: `  ${event.text}`, fg: THEME.fg }))
+              tui.body.add(Text({ content: `  ${event.text}`, fg: theme.fg }))
             }
           },
         })

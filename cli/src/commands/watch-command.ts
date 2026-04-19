@@ -2,30 +2,21 @@ import { Command } from 'commander'
 import { watch } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { Text } from '@opentui/core'
-import { THEME } from '../output/tui/theme.ts'
 import { loadConfig } from '../config/config-loader.ts'
 import { createPageTUI } from '../lib/tui-page.ts'
 import { makeDiffResult } from '../lib/make-diff-result.ts'
 import { runOrchestrator } from '@nexarq/agent-runtime'
 
-/**
- * nexarq watch
- *
- * Watches for file saves and runs a fast tier-1 review on the diff
- * as you code — findings appear before you commit.
- *
- * Token budget: fast mode only (haiku/flash/minimax) — typically <$0.001/save.
- * Debounces at 2s so rapid saves don't spam the LLM.
- */
 export function watchCommand(): Command {
   return new Command('watch')
     .description('Review code changes live as you save files')
     .option('-d, --dir <path>', 'Directory to watch (default: current directory)')
     .action(async (options: { dir?: string }) => {
-      const config = await loadConfig()
+      const config   = await loadConfig()
       const watchDir = options.dir ?? process.cwd()
 
       const tui = await createPageTUI('WATCH', 'FINDINGS', { exitOnCtrlC: false })
+      const { theme } = tui
       tui.status.content = `  Watching ${watchDir}  ·  Ctrl+C to stop`
 
       let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -45,9 +36,8 @@ export function watchCommand(): Command {
             return
           }
 
-          // Clear previous findings
           tui.clearBody()
-          tui.body.add(Text({ content: '  Running agents...', fg: THEME.fgDim }))
+          tui.body.add(Text({ content: '  Running agents...', fg: theme.fgDim }))
 
           const result = await runOrchestrator({
             task: 'Review the following diff',
@@ -56,19 +46,18 @@ export function watchCommand(): Command {
             runConfig: {
               provider: config.provider,
               ...(config.model ? { model: config.model } : {}),
-              mode: 'fast', // always fast in watch mode — costs near zero
+              mode: 'fast',
             },
           })
 
-          // Repaint findings
           tui.clearBody()
 
           if (result.summary.totalFindings === 0) {
-            tui.body.add(Text({ content: '  No issues found.', fg: THEME.green }))
+            tui.body.add(Text({ content: '  No issues found.', fg: theme.green }))
           } else {
             for (const agentResult of result.results) {
               for (const finding of agentResult.findings) {
-                const color = THEME.severity[finding.severity as keyof typeof THEME.severity] ?? THEME.fg
+                const color = theme.severity[finding.severity as keyof typeof theme.severity] ?? theme.fg
                 tui.body.add(Text({
                   content: `  [${finding.severity?.toUpperCase() ?? 'INFO'}] ${finding.message}`,
                   fg: color,
@@ -76,7 +65,7 @@ export function watchCommand(): Command {
                 if (finding.file) {
                   tui.body.add(Text({
                     content: `    ${finding.file}${finding.line ? `:${finding.line}` : ''}`,
-                    fg: THEME.fgDim,
+                    fg: theme.fgDim,
                   }))
                 }
               }
@@ -101,10 +90,8 @@ export function watchCommand(): Command {
         debounceTimer = setTimeout(() => void runReview(), 2000)
       })
 
-      // Run once on startup
       void runReview()
 
-      // Ctrl+C exits
       tui.renderer.keyInput.on('keypress', (event) => {
         if (event.ctrl && event.name === 'c') {
           watcher.close()
