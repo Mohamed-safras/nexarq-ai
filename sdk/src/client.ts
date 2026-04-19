@@ -1,5 +1,5 @@
-import { runOrchestrator } from '@nexarq/agent-runtime'
-import type { OrchestratorRunResult } from '@nexarq/agent-runtime'
+import { runOrchestrator, runWorkflowOrchestrator } from '@nexarq/agent-runtime'
+import type { OrchestratorRunResult, WorkflowRunResult } from '@nexarq/agent-runtime'
 import type { RunConfig, RunEvent } from '@nexarq/common/types'
 import type { TriggerSource } from '@nexarq/agent-runtime'
 
@@ -90,16 +90,15 @@ export class NexarqClient {
     })
   }
 
-  async code(codeOptions: CodeOptions): Promise<OrchestratorRunResult> {
-    return runOrchestrator({
+  async code(codeOptions: CodeOptions): Promise<WorkflowRunResult> {
+    return runWorkflowOrchestrator({
       task: codeOptions.task,
-      triggerSource: 'coding-agent',
       workingDirectory: codeOptions.workingDirectory ?? process.cwd(),
       runConfig: {
-        provider: this.options.provider,
-        model: this.options.model,
+        ...(this.options.provider ? { provider: this.options.provider } : {}),
+        ...(this.options.model ? { model: this.options.model } : {}),
       },
-      onEvent: codeOptions.onEvent,
+      ...(codeOptions.onEvent ? { onEvent: codeOptions.onEvent } : {}),
     })
   }
 
