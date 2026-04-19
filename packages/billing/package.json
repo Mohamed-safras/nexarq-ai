@@ -1,0 +1,14 @@
+{
+  "name": "@nexarq/billing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ads": "./src/ads.ts",
+    "./credits": "./src/credits.ts"
+  },
+  "dependencies": {
+    "@nexarq/common": "workspace:*"
+  }
+}
