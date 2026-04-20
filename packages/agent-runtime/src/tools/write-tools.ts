@@ -40,7 +40,10 @@ function isCommandAllowed(command: string): boolean {
  * Write and execute tools available only to coding agents (coder + tester nodes).
  * Review and architect agents receive only the read tools from read-tools.ts.
  */
-export function getWriteTools(workingDirectory: string) {
+export function getWriteTools(
+  workingDirectory: string,
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>,
+) {
   const safeResolve = (filePath: string): string => {
     const absolutePath = resolve(workingDirectory, filePath)
     if (!absolutePath.startsWith(resolve(workingDirectory))) {
@@ -57,9 +60,15 @@ export function getWriteTools(workingDirectory: string) {
         return `[BLOCKED] Content exceeds the ${MAX_WRITE_SIZE_BYTES}-byte limit.`
       }
 
-      if (existsSync(absolutePath)) {
-        const existing = readFileSync(absolutePath, 'utf-8')
-        writeFileSync(`${absolutePath}.nexarq-backup`, existing, 'utf-8')
+      const oldContent = existsSync(absolutePath) ? readFileSync(absolutePath, 'utf-8') : null
+
+      if (onBeforeWrite) {
+        const proceed = await onBeforeWrite(filePath, oldContent, content)
+        if (!proceed) return `[SKIPPED] Write to "${filePath}" was declined by the user.`
+      }
+
+      if (oldContent !== null) {
+        writeFileSync(`${absolutePath}.nexarq-backup`, oldContent, 'utf-8')
       }
 
       mkdirSync(dirname(absolutePath), { recursive: true })

@@ -14,6 +14,11 @@ export interface WorkflowRunOptions {
   runConfig?: RunConfig
   /** Streaming event callback */
   onEvent?: (event: RunEvent) => void
+  /**
+   * Called before each file write by a coding agent.
+   * Return true to proceed, false to skip the write.
+   */
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>
 }
 
 export interface WorkflowRunResult {
@@ -47,6 +52,7 @@ export async function runWorkflowOrchestrator(
     workingDirectory = process.cwd(),
     runConfig = {},
     onEvent,
+    onBeforeWrite,
   } = options
 
   // Load project knowledge (NEXARQ.md or .nexarq/knowledge.md)
@@ -83,7 +89,8 @@ export async function runWorkflowOrchestrator(
     subtasks: plan.subtasks,
     planSummary: plan.planSummary,
     ...(knowledgeContext ? { knowledgeContext } : {}),
-    ...(onEvent ? { onEvent } : {}),
+    ...(onEvent       ? { onEvent }       : {}),
+    ...(onBeforeWrite ? { onBeforeWrite } : {}),
   }
 
   const finalState: NexarqGraphState = await graph.invoke(initialState)

@@ -68,12 +68,16 @@ export async function runPlannerAgent(
   const startTime = Date.now()
 
   try {
-    const result = await agent.invoke({
-      messages: [
-        new SystemMessage(SYSTEM_PROMPT),
-        new HumanMessage(buildPrompt(task, knowledgeContext)),
-      ],
-    }) as { messages: BaseMessage[] }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (agent as any).invoke(
+      {
+        messages: [
+          new SystemMessage(SYSTEM_PROMPT),
+          new HumanMessage(buildPrompt(task, knowledgeContext)),
+        ],
+      },
+      { recursionLimit: 100 }
+    ) as { messages: BaseMessage[] }
 
     const lastMsg  = result.messages.at(-1)
     const rawOutput = lastMsg ? String(lastMsg.content) : ''

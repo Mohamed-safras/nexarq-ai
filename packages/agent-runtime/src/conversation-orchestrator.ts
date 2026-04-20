@@ -348,13 +348,17 @@ export async function runConversationTurn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agent = createReactAgent({ llm: chatModel, tools: allTools as any[] })
 
-  const result = await agent.invoke({
-    messages: [
-      new SystemMessage(systemPrompt),
-      ...historyMessages,
-      new HumanMessage(userMessage),
-    ],
-  }) as { messages: Array<{ content: unknown }> }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (agent as any).invoke(
+    {
+      messages: [
+        new SystemMessage(systemPrompt),
+        ...historyMessages,
+        new HumanMessage(userMessage),
+      ],
+    },
+    { recursionLimit: 100 }
+  ) as { messages: Array<{ content: unknown }> }
 
   // Extract text from the last message (may be content array if extended thinking used)
   const lastMsg = result.messages.at(-1)

@@ -35,12 +35,16 @@ export async function runReactAgent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agent = createReactAgent({ llm: chatModel as any, tools: tools as any[] })
 
-  const result = await agent.invoke({
-    messages: [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ],
-  }) as { messages: Array<{ content: unknown }> }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (agent as any).invoke(
+    {
+      messages: [
+        new SystemMessage(systemPrompt),
+        new HumanMessage(userPrompt),
+      ],
+    },
+    { recursionLimit: 100 }
+  ) as { messages: Array<{ content: unknown }> }
 
   const lastMsg = result.messages.at(-1)
   return lastMsg ? String(lastMsg.content) : ''
@@ -114,12 +118,16 @@ export async function runThinkingAgent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agent = createReactAgent({ llm: thinkingModel as any, tools: tools as any[] })
 
-  const result = await agent.invoke({
-    messages: [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ],
-  }) as { messages: Array<{ content: unknown }> }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (agent as any).invoke(
+    {
+      messages: [
+        new SystemMessage(systemPrompt),
+        new HumanMessage(userPrompt),
+      ],
+    },
+    { recursionLimit: 100 }
+  ) as { messages: Array<{ content: unknown }> }
 
   const lastMsg = result.messages.at(-1)
   if (!lastMsg) return ''

@@ -50,7 +50,7 @@ export async function runCoderNode(
   state.onEvent?.({ type: 'agent:start', agentName })
 
   const workingDirectory = state.workingDirectory ?? process.cwd()
-  const tools   = [...getReadTools(workingDirectory), ...getWriteTools(workingDirectory)]
+  const tools   = [...getReadTools(workingDirectory), ...getWriteTools(workingDirectory, state.onBeforeWrite)]
   const prompt  = buildPrompt(subtask, state.architectOutput, state.knowledgeContext)
   const mode    = state.runConfig.mode ?? 'smart'
   const startTime = Date.now()

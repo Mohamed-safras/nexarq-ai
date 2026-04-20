@@ -43,6 +43,7 @@ export interface NexarqGraphState {
   errorMessage?: string
   knowledgeContext?: string
   onEvent?: (event: RunEvent) => void
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>
 
   // ── Review flow ─────────────────────────────────────────────────────────────
   diffResult?: DiffResult
@@ -99,6 +100,7 @@ export function buildStateChannels(): Record<string, unknown> {
     errorMessage:           { default: () => undefined },
     knowledgeContext:       { default: () => undefined },
     onEvent:                { default: () => undefined },
+    onBeforeWrite:          { default: () => undefined },
 
     // Review flow
     diffResult:             { default: () => undefined },
