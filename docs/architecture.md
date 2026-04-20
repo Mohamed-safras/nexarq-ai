@@ -17,18 +17,22 @@
                   ┌─────────────────────────┐
                   │  packages/agent-runtime │
                   │                         │
-                  │  orchestrator.ts        │  ← single entry point
+                  │  orchestrator.ts        │  ← review entry point
+                  │  workflow-orchestrator  │  ← coding entry point
+                  │  conversation-          │  ← chat/REPL entry point
+                  │    orchestrator.ts      │    (persistent session)
+                  │  session-store.ts       │  ← .nexarq/session.json
                   │  graph/ (LangGraph)     │  ← StateGraph
                   │  providers/             │  ← LLM adapters
                   │  selector.ts            │  ← agent routing
-                  │  tools/                 │  ← review + coding tools
+                  │  tools/                 │  ← all tool sets
                   │  tracing/               │  ← LangSmith
                   │  registry.ts            │  ← agent lookup
                   └────────────┬────────────┘
                                │  imports
                   ┌────────────┴────────────┐
-                  │  agents │
-                  │  agents/index.ts         │
+                  │  agents/                │
+                  │  agents/index.ts        │
                   └────────────┬────────────┘
                                │  imports
                   ┌────────────┴────────────┐
@@ -67,21 +71,45 @@ The execution engine. Shared by CLI, SDK, web API, and git hooks. Never imported
 
 Key modules:
 
-- **`orchestrator.ts`** — `runOrchestrator(config)` — the single entry point for all surfaces
-- **`graph/graph.ts`** — `buildNexarqGraph()` — single LangGraph `StateGraph` with two paths: review fan-out and coding-agent ReAct loop
-- **`graph/state.ts`** — `NexarqGraphState` — unified state for both paths
+- **`orchestrator.ts`** — `runOrchestrator(config)` — review entry point (parallel agent fan-out)
+- **`workflow-orchestrator.ts`** — `runWorkflowOrchestrator(config)` — coding entry point (planner → coders → reviewer)
+- **`conversation-orchestrator.ts`** — `runConversationTurn(options)` — chat/REPL entry point with persistent history, context pruning, all tools
+- **`session-store.ts`** — `.nexarq/session.json` persistence: conversation history, last review, deterministic pruning at 30 messages
+- **`graph/graph.ts`** — `buildNexarqGraph()` — LangGraph `StateGraph`: router → review fan-out → triage → summary
+- **`graph/nodes/triage-node.ts`** — post-review cross-validation node (skipped in fast mode)
+- **`graph/state.ts`** — `NexarqGraphState` — unified state for all graph paths
 - **`selector.ts`** — `selectAgents(triggerSource, diff, config)` — tier-based routing with trigger-source overrides
 - **`providers/`** — Anthropic, OpenAI, Google, Ollama adapters via LangChain
-- **`tools/review-tools.ts`** — read-only tools: `read_file`, `search_code`, `list_directory`, `find_references`, `git_log`
-- **`tools/coding-tools.ts`** — read-write tools: `write_file`, `run_command`, `git_diff`, `git_status`
+- **`tools/read-tools.ts`** — `read_file`, `search_code`, `list_directory`, `find_references`, `git_log`, `web_search` (Brave)
+- **`tools/write-tools.ts`** — `write_file`, `str_replace` — for coding agents
+- **`tools/terminal-tools.ts`** — `run_validation` — allowlisted: tsc, bun test, eslint, jest, vitest, pytest, cargo test, go test
+- **`tools/shell-tools.ts`** — `run_shell` — unrestricted when `unsafeShell: true` (packages, migrations, deploys); allowlist-only by default
+- **`tools/docs-tools.ts`** — `read_docs` — Brave Search → Jina Reader for any library docs, auto-cached per session
+- **`tools/browser-tools.ts`** — `open_page`, `get_page_text`, `click_element`, `fill_form`, `take_screenshot` via Playwright
 - **`tracing/langsmith-tracer.ts`** — wraps runs with LangSmith tracing when env vars are set
 - **`registry.ts`** — `getAgent(name)`, `getAllAgents()`, `getAgentsByTier()`
 
 ### `cli/` — npm package `nexarq`
 
-Commander.js CLI. Calls `runOrchestrator()` from agent-runtime. Manages config (Conf), API keys (keytar), git hooks, and auth (GitHub Device Flow).
+Commander.js CLI. Calls agent-runtime entry points. Manages config (Conf), API keys (keytar), git hooks, and auth (GitHub Device Flow).
 
-Commands: `run`, `code`, `init`, `hook`, `config`, `login`, `doctor`
+Commands:
+
+| Command | Entry point | Description |
+|---------|-------------|-------------|
+| `nexarq` (default) | `conversation-orchestrator` | Interactive REPL with persistent session |
+| `nexarq run` | `orchestrator` | Parallel review of git diff |
+| `nexarq code <task>` | `workflow-orchestrator` | Multi-agent parallel coding team |
+| `nexarq chat` | `conversation-orchestrator` | TUI chat interface |
+| `nexarq fix` | `orchestrator` | Auto-apply AI-suggested fixes |
+| `nexarq explain <file>` | `orchestrator` | Plain-English file explanation |
+| `nexarq commit` | `orchestrator` | AI-generate commit messages |
+| `nexarq watch` | `orchestrator` | Live review on file save |
+| `nexarq init` | — | Setup wizard |
+| `nexarq hook` | — | Install/uninstall git hooks |
+| `nexarq config` | — | Show/set configuration |
+| `nexarq login` | — | GitHub Device Flow auth |
+| `nexarq doctor` | — | Environment health check |
 
 ### `sdk/` — npm package `@nexarq/sdk`
 

@@ -90,7 +90,12 @@ async function run(): Promise<void> {
       primaryLanguage: 'unknown',
     },
     triggerSource,
-    runConfig: { provider, model, mode, agents },
+    runConfig: {
+      provider,
+      ...(model   ? { model }   : {}),
+      mode,
+      ...(agents  ? { agents }  : {}),
+    },
   })
 
   const { summary, results } = result
@@ -129,7 +134,8 @@ async function run(): Promise<void> {
         if (agentResult.findings.length === 0) continue
         lines.push(`### ${agentResult.agentName}`)
         for (const finding of agentResult.findings.slice(0, 5)) {
-          lines.push(`- **[${finding.severity.toUpperCase()}]** ${finding.title}`)
+          const sev = finding.severity ? `[${finding.severity.toUpperCase()}] ` : ''
+          lines.push(`- **${sev}**${finding.message}`)
           if (finding.file) lines.push(`  > \`${finding.file}${finding.line ? `:${finding.line}` : ''}\``)
         }
         lines.push('')

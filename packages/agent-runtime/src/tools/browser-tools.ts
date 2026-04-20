@@ -27,6 +27,7 @@ async function getPage(): Promise<{ page: PlaywrightPage; error: null } | { page
     try {
       // Dynamic import — Playwright is an optional dependency
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // @ts-ignore — playwright is an optional peer dep; absence handled at runtime
       const pw = await import('playwright') as any
       const chromium = pw.chromium ?? pw.default?.chromium
       if (!chromium) throw new Error('chromium not found in playwright module')
@@ -76,11 +77,11 @@ export function getBrowserTools() {
     async ({ url }: { url: string }): Promise<string> => {
       const { page, error } = await getPage()
       if (error) return error
-      await page.goto(url, { timeout: NAV_TIMEOUT_MS, waitUntil: 'domcontentloaded' })
-      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
-      const text  = await safeInnerText(page)
-      const title = await page.title().catch(() => '')
-      return `[PAGE: ${title}] ${page.url()}\n\n${text}`
+      await page!.goto(url, { timeout: NAV_TIMEOUT_MS, waitUntil: 'domcontentloaded' })
+      await page!.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
+      const text  = await safeInnerText(page!)
+      const title = await page!.title().catch(() => '')
+      return `[PAGE: ${title}] ${page!.url()}\n\n${text}`
     },
     {
       name: 'open_page',
@@ -93,8 +94,8 @@ export function getBrowserTools() {
     async (): Promise<string> => {
       const { page, error } = await getPage()
       if (error) return error
-      const text  = await safeInnerText(page)
-      const title = await page.title().catch(() => '')
+      const text  = await safeInnerText(page!)
+      const title = await page!.title().catch(() => '')
       return `[PAGE: ${title}]\n\n${text}`
     },
     {
@@ -109,9 +110,9 @@ export function getBrowserTools() {
       const { page, error } = await getPage()
       if (error) return error
       try {
-        await page.locator(selector).click()
-        await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => {})
-        return `Clicked "${selector}". Current URL: ${page.url()}`
+        await page!.locator(selector).click()
+        await page!.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => {})
+        return `Clicked "${selector}". Current URL: ${page!.url()}`
       } catch (err) {
         return `[CLICK ERROR] ${err instanceof Error ? err.message : String(err)}`
       }
@@ -128,7 +129,7 @@ export function getBrowserTools() {
       const { page, error } = await getPage()
       if (error) return error
       try {
-        await page.locator(selector).fill(value)
+        await page!.locator(selector).fill(value)
         return `Filled "${selector}" with value.`
       } catch (err) {
         return `[FILL ERROR] ${err instanceof Error ? err.message : String(err)}`
@@ -149,7 +150,7 @@ export function getBrowserTools() {
       const { page, error } = await getPage()
       if (error) return error
       try {
-        const buf    = await page.screenshot({ type: 'png' })
+        const buf    = await page!.screenshot({ type: 'png' })
         const base64 = buf.toString('base64')
         // Return as a data URI the LLM can describe; most multimodal models accept this
         return `data:image/png;base64,${base64.slice(0, 20_000)}... [screenshot taken — ${buf.length} bytes]`

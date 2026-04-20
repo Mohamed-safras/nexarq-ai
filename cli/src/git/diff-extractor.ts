@@ -22,13 +22,15 @@ function getLastCommitDiff(): string {
     return execSync('git diff HEAD~1 HEAD', {
       encoding: 'utf-8',
       timeout: 10_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
   } catch {
-    // Fallback for first commit
+    // Fallback for first commit (no parent)
     try {
       return execSync('git show --format="" HEAD', {
         encoding: 'utf-8',
         timeout: 10_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
       })
     } catch {
       throw new Error('Could not extract git diff. Are you inside a git repository?')
@@ -41,6 +43,7 @@ function getStagedDiff(): string {
     return execSync('git diff --cached', {
       encoding: 'utf-8',
       timeout: 10_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
   } catch {
     throw new Error('Could not extract staged diff.')

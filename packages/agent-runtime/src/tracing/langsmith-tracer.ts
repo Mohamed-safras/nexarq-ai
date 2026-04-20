@@ -28,7 +28,7 @@ export function withTracing<TInput, TOutput>(
 ): (input: TInput) => Promise<TOutput> {
   if (!isTracingEnabled()) return fn
 
-  return traceable(fn, {
+  return traceable(fn as (...args: unknown[]) => unknown, {
     name: metadata.name,
     metadata: {
       triggerSource: metadata.triggerSource,

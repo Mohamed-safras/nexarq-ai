@@ -9,7 +9,7 @@ import { createRunTUI } from '../output/tui/run-tui.ts'
 import { createTuiEventHandler } from '../output/tui/tui-event-handler.ts'
 import type { AgentResult } from '@nexarq/common/interfaces'
 import type { TriggerSource } from '@nexarq/agent-runtime'
-import { confirm } from '@inquirer/prompts'
+import { select } from '@inquirer/prompts'
 import chalk from 'chalk'
 
 export function runCommand(): Command {
@@ -154,21 +154,47 @@ export function runCommand(): Command {
       printDetailedReport(result.results, result.durationMs)
 
       // ── Auto-apply prompt ────────────────────────────────────────────────
-      const actionable = result.results.filter(
-        (r) => !r.error && r.output.trim() &&
-               (r.severity === 'critical' || r.severity === 'high' || r.severity === 'medium')
-      )
+      const actionable = result.results.filter((r) => {
+        if (r.error) return false
+        const out = r.output.trim()
+        if (!out) return false
+        if (!['critical', 'high', 'medium'].includes(r.severity)) return false
+        // Skip agents that concluded with no findings
+        const lines = out.split('\n').map((l) => l.trim()).filter(Boolean)
+        return !lines.some((l) => /^NO FINDINGS$/i.test(l))
+      })
       if (options.fix !== false && actionable.length > 0) {
-        console.log()
-        const shouldFix = await confirm({
-          message: chalk.yellow(`Apply auto-fixes for ${actionable.length} finding(s)?`),
-          default: false,
-        }).catch(() => false)
+        const sev = actionable.reduce((acc, r) => {
+          acc[r.severity] = (acc[r.severity] ?? 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        const sevStr = Object.entries(sev)
+          .sort((a, b) => ['critical','high','medium','low','info'].indexOf(a[0]) - ['critical','high','medium','low','info'].indexOf(b[0]))
+          .map(([s, n]) => (SEV_COLOR[s] ?? chalk.gray)(`${n} ${s}`))
+          .join(chalk.gray('  ·  '))
 
-        if (shouldFix) {
+        console.log()
+        console.log(chalk.gray('  ──  ') + chalk.bold('Apply fixes?') + chalk.gray(`  ${sevStr}`))
+        console.log()
+
+        const choice = await select({
+          message: 'Choose an action',
+          choices: [
+            { name: chalk.green('✓') + `  apply    apply all ${actionable.length} fix(es) now`,  value: 'apply',  short: 'apply'  },
+            { name: chalk.cyan('⟳') + '  review   step through each fix before applying',         value: 'review', short: 'review' },
+            { name: chalk.gray('·') + '  skip     continue without fixing',                        value: 'skip',   short: 'skip'   },
+          ],
+          default: 'skip',
+        }).catch(() => 'skip')
+
+        if (choice === 'apply') {
           const { fixCommand } = await import('./fix-command.ts')
           const fixCmd = fixCommand()
-          await fixCmd.parseAsync(['node', 'nexarq', '--from-run'], { from: 'user' })
+          await fixCmd.parseAsync(['node', 'nexarq', '--all'], { from: 'user' })
+        } else if (choice === 'review') {
+          const { fixCommand } = await import('./fix-command.ts')
+          const fixCmd = fixCommand()
+          await fixCmd.parseAsync(['node', 'nexarq'], { from: 'user' })
         }
       }
     } catch (runError) {
@@ -202,8 +228,9 @@ function formatSeveritySummary(summary: { critical: number; high: number; medium
 }
 
 function printDetailedReport(results: AgentResult[], durationMs: number): void {
-  const cols = process.stdout.columns ?? 80
-  const rule = chalk.gray('─'.repeat(Math.min(cols - 2, 72)))
+  const cols = Math.max(process.stdout.columns ?? 80, 60)
+  const ruleW = cols - 4
+  const rule = chalk.gray('─'.repeat(ruleW))
   const elapsed = (durationMs / 1000).toFixed(1)
 
   console.log()
@@ -225,9 +252,8 @@ function printDetailedReport(results: AgentResult[], durationMs: number): void {
     const color = SEV_COLOR[result.severity] ?? chalk.gray
     console.log()
     console.log(color(`  [${result.severity.toUpperCase().padEnd(8)}]  `) + chalk.bold(result.agentName))
-    console.log(chalk.gray('  ' + '─'.repeat(Math.min(cols - 4, 60))))
+    console.log(chalk.gray('  ' + '─'.repeat(ruleW - 2)))
 
-    // Print full output, indented 4 spaces
     for (const line of output.split('\n')) {
       console.log('    ' + line)
     }

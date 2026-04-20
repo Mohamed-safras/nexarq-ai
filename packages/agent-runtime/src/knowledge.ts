@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const KNOWLEDGE_FILENAMES = [
-  'NEXARQ.md',
   '.nexarq/knowledge.md',
   '.nexarq/NEXARQ.md',
 ]

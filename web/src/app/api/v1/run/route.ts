@@ -18,17 +18,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const runResult = await runOrchestrator({
       task: 'Review the provided diff',
-      diffResult: body.diff
-        ? {
-            rawDiff: body.diff,
-            files: [],
-            totalAdded: body.diff.split('\n').filter((line) => line.startsWith('+')).length,
-            totalRemoved: body.diff.split('\n').filter((line) => line.startsWith('-')).length,
-            changeType: 'general',
-            repoType: 'unknown',
-            primaryLanguage: 'unknown',
-          }
-        : undefined,
+      ...(body.diff ? {
+        diffResult: {
+          rawDiff: body.diff,
+          files: [],
+          totalAdded: body.diff.split('\n').filter((line) => line.startsWith('+')).length,
+          totalRemoved: body.diff.split('\n').filter((line) => line.startsWith('-')).length,
+          changeType: 'general',
+          repoType: 'unknown',
+          primaryLanguage: 'unknown',
+        },
+      } : {}),
       triggerSource: 'sdk',
       runConfig: body.config ?? {},
     })

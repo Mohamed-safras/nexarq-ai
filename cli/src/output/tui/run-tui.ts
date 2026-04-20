@@ -8,7 +8,7 @@ export interface RunTUI {
   initAgents(names: string[]): void
   setAgentStatus(name: string, status: AgentStatus): void
   appendChunk(agentName: string, text: string): void
-  addFinding(agentName: string, severity: string, lines: string[]): void
+  addFinding(agentName: string, severity: string, lines: string[], latencyMs?: number): void
   updateFooter(agentsRun: number, total: number, summary: Partial<RunSummary>, tokens: number): void
   showComplete(durationMs: number): void
   waitForExit(): Promise<void>
@@ -220,7 +220,7 @@ export async function createRunTUI(diffLineCount: number): Promise<RunTUI> {
     else if (k === '\x1b[6~' || k === 'd')             { scrollOffset = Math.max(0, scrollOffset - 10); render() }
     else if (k === 'g')                                 { scrollOffset = 999999;                render() }
     else if (k === 'G')                                 { scrollOffset = 0;                     render() }
-    else if (isComplete && (k === 'q' || k === '\r' || k === '\n' || k === '\x03')) {
+    else if (isComplete) {
       exitResolve?.()
     }
   }
@@ -230,6 +230,8 @@ export async function createRunTUI(diffLineCount: number): Promise<RunTUI> {
     process.stdin.resume()
     process.stdin.on('data', onKey)
   }
+
+  process.stdout.on('resize', render)
 
   // ── Screen builder ───────────────────────────────────────────────────────────
   function buildScreen(): string {
@@ -373,18 +375,19 @@ export async function createRunTUI(diffLineCount: number): Promise<RunTUI> {
       clearInterval(spinInterval)
       partials.clear()
       const elapsed = (durationMs / 1000).toFixed(1)
-      footerText = `  ${C.green}${BOLD}✓ Review complete${R}  ${C.dim}${elapsed}s  ·  q to exit${R}`
+      footerText = `  ${C.green}${BOLD}✓ Review complete${R}  ${C.dim}${elapsed}s  ·  any key to continue${R}`
       render()
-      if (!process.stdin.isTTY) setTimeout(() => exitResolve?.(), 100)
+      // Auto-proceed after brief display so the fix prompt appears automatically
+      setTimeout(() => exitResolve?.(), process.stdin.isTTY ? 2500 : 100)
     },
 
     waitForExit(): Promise<void> {
-      if (!isComplete) return Promise.resolve()
       return new Promise((resolve) => { exitResolve = resolve })
     },
 
     destroy() {
       clearInterval(spinInterval)
+      process.stdout.off('resize', render)
       process.stdout.write(EXIT_ALT)
       if (process.stdin.isTTY) {
         try { process.stdin.setRawMode(false); process.stdin.pause(); process.stdin.off('data', onKey) }

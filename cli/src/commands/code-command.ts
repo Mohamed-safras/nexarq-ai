@@ -1,10 +1,12 @@
-import { Command } from 'commander'
+import { select } from '@inquirer/prompts'
 import { runWorkflowOrchestrator } from '@nexarq/agent-runtime'
+import chalk from 'chalk'
+import { Command } from 'commander'
 import { loadConfig } from '../config/config-loader.ts'
+import { approveEdit, createEditSession } from '../lib/edit-approval.ts'
 import { printError } from '../output/formatter.ts'
 import { createRunTUI } from '../output/tui/run-tui.ts'
 import { createTuiEventHandler } from '../output/tui/tui-event-handler.ts'
-import chalk from 'chalk'
 
 export function codeCommand(): Command {
   const command = new Command('code')
@@ -18,6 +20,8 @@ export function codeCommand(): Command {
 
     const tui = await createRunTUI(0)
     const { state: tuiState, onEvent } = createTuiEventHandler(tui)
+    const editSession = createEditSession()
+    let tuiAlive = true
 
     try {
       const result = await runWorkflowOrchestrator({
@@ -28,17 +32,62 @@ export function codeCommand(): Command {
           ...(config.model ? { model: config.model } : {}),
         },
         onEvent,
+        onBeforeWrite: async (filePath, oldContent, newContent) => {
+          if (tuiAlive) { tui.destroy(); tuiAlive = false }
+          const displayPath = filePath.startsWith(workingDirectory)
+            ? filePath.slice(workingDirectory.length).replace(/^[\\/]/, '').replace(/\\/g, '/')
+            : filePath.replace(/\\/g, '/')
+          const decision = await approveEdit({
+            displayPath,
+            oldContent: oldContent ?? '',
+            newContent,
+            session: editSession,
+          })
+          return decision === 'yes'
+        },
       })
 
-      tui.updateFooter(tuiState.totalAgents, tuiState.totalAgents, {}, 0)
-      tui.showComplete(result.durationMs)
-
-      await tui.waitForExit()
-      tui.destroy()
+      if (tuiAlive) {
+        tui.updateFooter(tuiState.totalAgents, tuiState.totalAgents, {}, 0)
+        tui.showComplete(result.durationMs)
+        await tui.waitForExit()
+        tui.destroy()
+        tuiAlive = false
+      }
 
       printWorkflowReport(result)
+
+      if (result.modifiedFiles.length > 0) {
+        console.log()
+        console.log(
+          chalk.gray('  ──  ') +
+          chalk.bold('What next?') +
+          chalk.gray(`  ${result.modifiedFiles.length} file(s) modified`)
+        )
+        console.log()
+
+        const choice = await select({
+          message: 'Choose an action',
+          choices: [
+            { name: chalk.cyan('⟳') + '  review   run code review on the changes', value: 'review', short: 'review' },
+            { name: chalk.green('✓') + '  commit   commit the changes with a message', value: 'commit', short: 'commit' },
+            { name: chalk.gray('·') + '  skip     done, no further action', value: 'skip', short: 'skip' },
+          ],
+          default: 'skip',
+        }).catch(() => 'skip')
+
+        if (choice === 'review') {
+          const { runCommand } = await import('./run-command.ts')
+          const runCmd = runCommand()
+          await runCmd.parseAsync(['node', 'nexarq'], { from: 'user' })
+        } else if (choice === 'commit') {
+          const { commitCommand } = await import('./commit-command.ts')
+          const commitCmd = commitCommand()
+          await commitCmd.parseAsync(['node', 'nexarq'], { from: 'user' })
+        }
+      }
     } catch (codeError) {
-      tui.destroy()
+      if (tuiAlive) { tui.destroy(); tuiAlive = false }
       printError(codeError instanceof Error ? codeError.message : String(codeError))
       process.exit(1)
     }
@@ -54,8 +103,10 @@ function printWorkflowReport(result: {
   modifiedFiles: string[]
   durationMs: number
 }): void {
-  const cols  = process.stdout.columns ?? 80
-  const rule  = chalk.gray('─'.repeat(Math.min(cols - 2, 72)))
+  const cols = Math.max(process.stdout.columns ?? 80, 60)
+  const ruleW = cols - 4
+  const rule = chalk.gray('─'.repeat(ruleW))
+  const subRule = chalk.gray('  ' + '─'.repeat(ruleW - 2))
   const elapsed = (result.durationMs / 1000).toFixed(1)
 
   console.log()
@@ -69,14 +120,14 @@ function printWorkflowReport(result: {
   if (result.planSummary) {
     console.log()
     console.log(chalk.bold('  Plan'))
-    console.log(chalk.gray('  ' + '─'.repeat(40)))
+    console.log(subRule)
     console.log('    ' + result.planSummary)
   }
 
   if (result.reviewerOutput) {
     console.log()
     console.log(chalk.bold('  Review'))
-    console.log(chalk.gray('  ' + '─'.repeat(40)))
+    console.log(subRule)
     for (const line of result.reviewerOutput.trim().split('\n')) {
       console.log('    ' + line)
     }
@@ -85,7 +136,7 @@ function printWorkflowReport(result: {
   if (result.modifiedFiles.length > 0) {
     console.log()
     console.log(chalk.bold('  Modified files'))
-    console.log(chalk.gray('  ' + '─'.repeat(40)))
+    console.log(subRule)
     for (const f of result.modifiedFiles) {
       console.log(chalk.green(`    ✓ ${f}`))
     }

@@ -9,6 +9,7 @@
     "./credits": "./src/credits.ts"
   },
   "dependencies": {
-    "@nexarq/common": "workspace:*"
+    "@nexarq/common": "workspace:*",
+    "chalk": "^5.4.1"
   }
 }

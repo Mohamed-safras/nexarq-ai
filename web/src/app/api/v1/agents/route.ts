@@ -8,7 +8,6 @@ export async function GET(): Promise<NextResponse> {
     description: agentDef.description,
     severity:    agentDef.severity,
     tier:        agentDef.tier,
-    needsTools:  agentDef.needsTools,
   }))
 
   return NextResponse.json({ agents, total: agents.length })

@@ -56,4 +56,25 @@ program.addCommand(configCommand())
 program.addCommand(loginCommand())
 program.addCommand(doctorCommand())
 
+program.on('command:*', (operands: string[]) => {
+  const unknown = operands[0] ?? ''
+  const known = program.commands.map((c: import('commander').Command) => c.name())
+  const suggestion = known.find((n: string) => {
+    const a = n.toLowerCase(), b = unknown.toLowerCase()
+    if (Math.abs(a.length - b.length) > 3) return false
+    let diff = 0
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if (a[i] !== b[i]) diff++
+    }
+    return diff <= 2
+  })
+  const dim = '\x1b[2m', red = '\x1b[31m', cyan = '\x1b[36m', R = '\x1b[0m'
+  process.stderr.write(
+    `\n  ${red}Unknown command:${R} ${unknown}\n` +
+    (suggestion ? `  ${dim}Did you mean:${R}  ${cyan}nexarq ${suggestion}${R}\n` : '') +
+    `  ${dim}Run${R} ${cyan}nexarq --help${R} ${dim}for available commands.${R}\n\n`
+  )
+  process.exit(1)
+})
+
 program.parse()

@@ -106,12 +106,13 @@ async function postPrComment(
     if (agentResult.findings.length === 0) continue
     lines.push(`### ${agentResult.agentName}`)
     for (const finding of agentResult.findings.slice(0, 5)) {
-      lines.push(`- **[${finding.severity.toUpperCase()}]** ${finding.title}`)
+      const sev = finding.severity ? `[${finding.severity.toUpperCase()}] ` : ''
+      lines.push(`- **${sev}**${finding.message}`)
       if (finding.file) {
         lines.push(`  > \`${finding.file}${finding.line ? `:${finding.line}` : ''}\``)
       }
-      if (finding.description) {
-        lines.push(`  ${finding.description.slice(0, 200)}`)
+      if (finding.suggestion) {
+        lines.push(`  ${finding.suggestion.slice(0, 200)}`)
       }
     }
     if (agentResult.findings.length > 5) {

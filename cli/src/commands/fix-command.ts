@@ -1,13 +1,14 @@
+import type { AgentFinding } from '@nexarq/common/interfaces'
+import { Select, Text } from '@opentui/core'
 import { Command } from 'commander'
-import { writeFileSync, existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { Text, Select } from '@opentui/core'
-import { printError } from '../output/formatter.ts'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { loadConfig } from '../config/config-loader.ts'
 import { extractDiff } from '../git/diff-extractor.ts'
-import { createPageTUI } from '../lib/tui-page.ts'
+import { approveEdit, createEditSession } from '../lib/edit-approval.ts'
 import { makeDiffResult } from '../lib/make-diff-result.ts'
-import type { AgentFinding } from '@nexarq/common/interfaces'
+import { createPageTUI } from '../lib/tui-page.ts'
+import { printError } from '../output/formatter.ts'
 
 /**
  * nexarq fix
@@ -21,7 +22,7 @@ import type { AgentFinding } from '@nexarq/common/interfaces'
 export function fixCommand(): Command {
   return new Command('fix')
     .description('Auto-apply AI-suggested fixes from the last review')
-    .option('-a, --all',   'Apply all suggested fixes without prompting')
+    .option('-a, --all', 'Apply all suggested fixes without prompting')
     .option('-d, --diff <file>', 'Path to a diff file instead of git diff')
     .action(async (options: { all?: boolean; diff?: string }) => {
       const config = await loadConfig()
@@ -81,7 +82,9 @@ export function fixCommand(): Command {
 
         if (options.all) {
           tui.renderer.destroy()
-          applyFixes(fixes.map((f) => f.file), fixes.map((f) => f.patch))
+          const session = createEditSession()
+          session.approveAll = true
+          await applyFixes(fixes.map((f) => f.file), fixes.map((f) => f.patch), session)
           return
         }
 
@@ -96,15 +99,15 @@ export function fixCommand(): Command {
 
         const fixSelect = Select({
           options: selectOptions,
-          textColor:               tui.theme.fg,
-          backgroundColor:         tui.theme.bg,
-          focusedBackgroundColor:  tui.theme.bgAlt,
-          focusedTextColor:        tui.theme.cyan,
+          textColor: tui.theme.fg,
+          backgroundColor: tui.theme.bg,
+          focusedBackgroundColor: tui.theme.bgAlt,
+          focusedTextColor: tui.theme.cyan,
           selectedBackgroundColor: tui.theme.green,
-          selectedTextColor:       tui.theme.bg,
-          wrapSelection:           true,
-          showDescription:         true,
-          width:                   '100%',
+          selectedTextColor: tui.theme.bg,
+          wrapSelection: true,
+          showDescription: true,
+          width: '100%',
         })
         tui.body.add(fixSelect)
         fixSelect.focus()
@@ -142,13 +145,17 @@ export function fixCommand(): Command {
 
         const chosenFix = fixes[selectedIndex]
         if (chosenFix) {
-          applyFixes([chosenFix.file], [chosenFix.patch])
+          await applyFixes([chosenFix.file], [chosenFix.patch], createEditSession())
         }
       })
     })
 }
 
-function applyFixes(files: string[], patches: string[]): void {
+async function applyFixes(
+  files: string[],
+  patches: string[],
+  session: ReturnType<typeof createEditSession>,
+): Promise<void> {
   const cwd = process.cwd()
   for (let index = 0; index < files.length; index++) {
     const file = files[index]
@@ -161,16 +168,24 @@ function applyFixes(files: string[], patches: string[]): void {
       continue
     }
 
-    // The ai-fixes agent returns suggestions as descriptive text, not raw patches.
-    // For production, a structured diff-apply would be used here.
-    // For now: write the suggestion as a comment at the top of the file.
+    // ai-fixes agent returns descriptive suggestions, not raw patches.
+    // Prepend as a comment block so the developer can review and apply manually.
     const existing = readFileSync(fullPath, 'utf-8')
     const commentPrefix = fullPath.endsWith('.py') ? '# ' : '// '
     const commentBlock = patch
       .split('\n')
       .map((line) => `${commentPrefix}${line}`)
       .join('\n')
-    writeFileSync(fullPath, `${commentBlock}\n\n${existing}`, 'utf-8')
-    console.log(`  Applied fix to ${file}`)
+    const newContent = `${commentBlock}\n\n${existing}`
+
+    const displayPath = relative(cwd, fullPath).replace(/\\/g, '/')
+    const decision = await approveEdit({ displayPath, oldContent: existing, newContent, session })
+
+    if (decision === 'yes') {
+      writeFileSync(fullPath, newContent, 'utf-8')
+      console.log(`  Applied fix to ${file}`)
+    } else {
+      console.log(`  Skipped ${file}`)
+    }
   }
 }
