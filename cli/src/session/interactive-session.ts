@@ -1,9 +1,12 @@
+import { relative, resolve } from 'node:path'
 import * as readline from 'node:readline'
-import { loadConfig } from '../config/config-loader.ts'
-import { getThemeByVariant, themeToAnsi } from '../output/tui/theme.ts'
 import type { NexarqConfig } from '../config/config-loader.ts'
+import { loadConfig } from '../config/config-loader.ts'
+import { createEditSession } from '../lib/edit-approval.ts'
+import { streamingApproveEdit } from '../lib/streaming-preview.ts'
+import { getThemeByVariant, themeToAnsi } from '../output/tui/theme.ts'
 
-const R    = '\x1b[0m'
+const R = '\x1b[0m'
 const BOLD = '\x1b[1m'
 
 const LOGO = [
@@ -17,10 +20,10 @@ const LOGO = [
 
 function lerp(from: string, to: string, steps: number): string[] {
   const fr = parseInt(from.slice(1, 3), 16), fg = parseInt(from.slice(3, 5), 16), fb = parseInt(from.slice(5, 7), 16)
-  const tr = parseInt(to.slice(1, 3), 16),   tg = parseInt(to.slice(3, 5), 16),   tb = parseInt(to.slice(5, 7), 16)
+  const tr = parseInt(to.slice(1, 3), 16), tg = parseInt(to.slice(3, 5), 16), tb = parseInt(to.slice(5, 7), 16)
   return Array.from({ length: steps }, (_, i) => {
     const t = steps === 1 ? 0 : i / (steps - 1)
-    return `\x1b[38;2;${Math.round(fr+(tr-fr)*t)};${Math.round(fg+(tg-fg)*t)};${Math.round(fb+(tb-fb)*t)}m`
+    return `\x1b[38;2;${Math.round(fr + (tr - fr) * t)};${Math.round(fg + (tg - fg) * t)};${Math.round(fb + (tb - fb) * t)}m`
   })
 }
 
@@ -47,20 +50,20 @@ function pad(s: string, width: number): string {
 }
 
 function renderWelcomeBox(c: ReturnType<typeof themeToAnsi>, theme: ReturnType<typeof getThemeByVariant>, config: NexarqConfig): void {
-  const cols   = Math.max(process.stdout.columns || 80, 60)
-  const boxW   = cols - 2
-  const inner  = boxW - 2
+  const cols = Math.max(process.stdout.columns || 80, 60)
+  const boxW = cols - 2
+  const inner = boxW - 2
   const MIN_RIGHT = 34
-  const leftW  = Math.min(Math.max(52, Math.floor(inner * 0.52)), inner - MIN_RIGHT - 1)
+  const leftW = Math.min(Math.max(52, Math.floor(inner * 0.52)), inner - MIN_RIGHT - 1)
   const rightW = inner - leftW - 1   // -1 for │ divider
 
   const titleStr = `─── Nexarq v0.1.0 `
   const top = `╭${titleStr}${'─'.repeat(Math.max(0, boxW - 2 - titleStr.length))}╮`
   const bot = `╰${'─'.repeat(boxW - 2)}╯`
 
-  const username  = process.env['USERNAME'] || process.env['USER'] || 'developer'
-  const cwd       = process.cwd()
-  const provider  = config.provider + (config.model ? ` · ${config.model}` : '')
+  const username = process.env['USERNAME'] || process.env['USER'] || 'developer'
+  const cwd = process.cwd()
+  const provider = config.provider + (config.model ? ` · ${config.model}` : '')
   const gradients = lerp(theme.cyan, theme.purple, LOGO.length)
 
   const L: string[] = [
@@ -68,8 +71,6 @@ function renderWelcomeBox(c: ReturnType<typeof themeToAnsi>, theme: ReturnType<t
     `  ${BOLD}Welcome back, ${username}!${R}`,
     '',
     ...LOGO.map((line, i) => `${gradients[i] ?? ''}${line}${R}`),
-    '',
-    `  ${c.dim}parallel AI coding team  ·  v0.1.0${R}`,
     '',
     `  ${c.dim}${provider}${R}`,
     `  ${c.dim}${cwd}${R}`,
@@ -87,11 +88,11 @@ function renderWelcomeBox(c: ReturnType<typeof themeToAnsi>, theme: ReturnType<t
     ' Type any task naturally to get started',
     '',
     ` ${BOLD}Commands${R}`,
-    cmdLine('review',  'run 31-agent code review'),
-    cmdLine('code',    'implement a feature'),
+    cmdLine('review', 'run 31-agent code review'),
+    cmdLine('code', 'implement a feature'),
     cmdLine('explain', 'explain any file'),
-    cmdLine('search',  'web search'),
-    cmdLine('help',    'show all commands'),
+    cmdLine('search', 'web search'),
+    cmdLine('help', 'show all commands'),
     '',
     ` ${c.dim}exit · quit to leave${R}`,
   ]
@@ -101,7 +102,7 @@ function renderWelcomeBox(c: ReturnType<typeof themeToAnsi>, theme: ReturnType<t
   process.stdout.write('\n')
   process.stdout.write(c.dim + top + R + '\n')
   for (let i = 0; i < rows; i++) {
-    const lc = pad(L[i]  ?? '', leftW)
+    const lc = pad(L[i] ?? '', leftW)
     const rc = pad(RL[i] ?? '', rightW)
     process.stdout.write(c.dim + '│' + R + lc + c.dim + '│' + R + rc + c.dim + '│' + R + '\n')
   }
@@ -110,8 +111,8 @@ function renderWelcomeBox(c: ReturnType<typeof themeToAnsi>, theme: ReturnType<t
 
 export async function runInteractiveSession(): Promise<void> {
   const config = await loadConfig()
-  const theme  = getThemeByVariant(config.theme ?? 'dark')
-  const c      = themeToAnsi(theme)
+  const theme = getThemeByVariant(config.theme ?? 'dark')
+  const c = themeToAnsi(theme)
 
   renderWelcomeBox(c, theme, config)
 
@@ -122,13 +123,23 @@ export async function runInteractiveSession(): Promise<void> {
     ...(config.model ? { model: config.model } : {}),
     unsafeShell: config.unsafeShell ?? false,
   }
-
   const rl = readline.createInterface({
-    input:    process.stdin,
-    output:   process.stdout,
-    prompt:   c.cyan + BOLD + '  nexarq' + R + c.dim + ' › ' + R,
+    input: process.stdin,
+    output: process.stdout,
+    prompt: c.cyan + BOLD + '  nexarq' + R + c.dim + ' › ' + R,
     terminal: true,
   })
+
+  const editSession = createEditSession()
+  const onBeforeWrite = async (filePath: string, oldContent: string | null, newContent: string, line?: number): Promise<boolean> => {
+    const fullPath = resolve(workingDirectory, filePath)
+    const displayPath = relative(workingDirectory, fullPath).replace(/\\/g, '/')
+    rl.pause()
+    process.stdout.write('\n')
+    const decision = await streamingApproveEdit({ displayPath, fullPath, oldContent: oldContent ?? '', newContent, session: editSession, workingDirectory })
+    rl.resume()
+    return decision === 'yes'
+  }
 
   rl.prompt()
 
@@ -160,6 +171,7 @@ export async function runInteractiveSession(): Promise<void> {
         userMessage: input,
         workingDirectory,
         runConfig,
+        onBeforeWrite,
       })
 
       process.stdout.write('                   \r')
@@ -190,12 +202,12 @@ export async function runInteractiveSession(): Promise<void> {
 
 function printHelp(c: ReturnType<typeof themeToAnsi>): void {
   const rows: [string, string][] = [
-    ['<task>',          'Implement, fix, or refactor code using the agent team'],
-    ['review / scan',   'Run full 31-agent parallel code review on current diff'],
-    ['explain <file>',  'Explain any file or line range in plain English'],
-    ['search <query>',  'Web search for docs, CVEs, Stack Overflow answers'],
-    ['help',            'Show this help'],
-    ['exit / quit',     'Exit the session'],
+    ['<task>', 'Implement, fix, or refactor code using the agent team'],
+    ['review / scan', 'Run full 31-agent parallel code review on current diff'],
+    ['explain <file>', 'Explain any file or line range in plain English'],
+    ['search <query>', 'Web search for docs, CVEs, Stack Overflow answers'],
+    ['help', 'Show this help'],
+    ['exit / quit', 'Exit the session'],
   ]
   process.stdout.write('\n')
   for (const [cmd, desc] of rows) {

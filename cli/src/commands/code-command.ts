@@ -2,8 +2,10 @@ import { select } from '@inquirer/prompts'
 import { runWorkflowOrchestrator } from '@nexarq/agent-runtime'
 import chalk from 'chalk'
 import { Command } from 'commander'
+import { resolve, relative } from 'node:path'
 import { loadConfig } from '../config/config-loader.ts'
-import { approveEdit, createEditSession } from '../lib/edit-approval.ts'
+import { createEditSession } from '../lib/edit-approval.ts'
+import { streamingApproveEdit } from '../lib/streaming-preview.ts'
 import { printError } from '../output/formatter.ts'
 import { createRunTUI } from '../output/tui/run-tui.ts'
 import { createTuiEventHandler } from '../output/tui/tui-event-handler.ts'
@@ -32,16 +34,17 @@ export function codeCommand(): Command {
           ...(config.model ? { model: config.model } : {}),
         },
         onEvent,
-        onBeforeWrite: async (filePath, oldContent, newContent) => {
+        onBeforeWrite: async (filePath, oldContent, newContent, line) => {
           if (tuiAlive) { tui.destroy(); tuiAlive = false }
-          const displayPath = filePath.startsWith(workingDirectory)
-            ? filePath.slice(workingDirectory.length).replace(/^[\\/]/, '').replace(/\\/g, '/')
-            : filePath.replace(/\\/g, '/')
-          const decision = await approveEdit({
+          const fullPath    = resolve(workingDirectory, filePath)
+          const displayPath = relative(workingDirectory, fullPath).replace(/\\/g, '/')
+          const decision = await streamingApproveEdit({
             displayPath,
+            fullPath,
             oldContent: oldContent ?? '',
             newContent,
             session: editSession,
+            workingDirectory,
           })
           return decision === 'yes'
         },

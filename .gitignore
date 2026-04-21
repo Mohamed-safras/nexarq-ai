@@ -24,9 +24,15 @@ npm-app/src/__tests__/data/
 
 debug/
 
+# Live preview files created during agent-assisted edits
+.agent-preview/
+
 # Nx cache directories
 .nx/cache
 .nx/workspace-data
 
 # Infisical config (user-specific)
 .infisical.json
+
+# Next.js build output
+web/.next/

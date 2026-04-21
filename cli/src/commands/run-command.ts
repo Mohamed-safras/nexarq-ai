@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { Command } from 'commander'
 import { runOrchestrator } from '@nexarq/agent-runtime'
 import { extractDiff } from '../git/diff-extractor.ts'
@@ -7,7 +9,7 @@ import { printError } from '../output/formatter.ts'
 import { createSpinner } from '../output/spinner.ts'
 import { createRunTUI } from '../output/tui/run-tui.ts'
 import { createTuiEventHandler } from '../output/tui/tui-event-handler.ts'
-import type { AgentResult } from '@nexarq/common/interfaces'
+import { approveEdit, createEditSession } from '../lib/edit-approval.ts'
 import type { TriggerSource } from '@nexarq/agent-runtime'
 import { select } from '@inquirer/prompts'
 import chalk from 'chalk'
@@ -150,19 +152,16 @@ export function runCommand(): Command {
       await tui.waitForExit()
       tui.destroy()
 
-      // ── Full detailed report after TUI exits ─────────────────────────────
-      printDetailedReport(result.results, result.durationMs)
-
-      // ── Auto-apply prompt ────────────────────────────────────────────────
+      // ── Inline fix prompt (no separate FIX window) ───────────────────────
       const actionable = result.results.filter((r) => {
         if (r.error) return false
         const out = r.output.trim()
         if (!out) return false
         if (!['critical', 'high', 'medium'].includes(r.severity)) return false
-        // Skip agents that concluded with no findings
         const lines = out.split('\n').map((l) => l.trim()).filter(Boolean)
         return !lines.some((l) => /^NO FINDINGS$/i.test(l))
       })
+
       if (options.fix !== false && actionable.length > 0) {
         const sev = actionable.reduce((acc, r) => {
           acc[r.severity] = (acc[r.severity] ?? 0) + 1
@@ -187,14 +186,85 @@ export function runCommand(): Command {
           default: 'skip',
         }).catch(() => 'skip')
 
-        if (choice === 'apply') {
-          const { fixCommand } = await import('./fix-command.ts')
-          const fixCmd = fixCommand()
-          await fixCmd.parseAsync(['node', 'nexarq', '--all'], { from: 'user' })
-        } else if (choice === 'review') {
-          const { fixCommand } = await import('./fix-command.ts')
-          const fixCmd = fixCommand()
-          await fixCmd.parseAsync(['node', 'nexarq'], { from: 'user' })
+        if (choice !== 'skip') {
+          // Parse FINDING:/SUGGESTION: pairs directly from review agent output —
+          // no extra agent call needed.
+          interface ParsedFix {
+            agentName: string
+            file: string
+            line: number
+            message: string
+            suggestion: string
+          }
+          const fixes: ParsedFix[] = []
+
+          for (const r of actionable) {
+            const lines = r.output.split('\n')
+            for (let i = 0; i < lines.length; i++) {
+              const m = (lines[i] ?? '').match(/^FINDING:\s+(\S+?):(\d+)\s+[—–-]+\s+(.+)$/)
+              if (!m) continue
+              let suggestion = ''
+              for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                const s = (lines[j] ?? '').trim()
+                if (s.startsWith('SUGGESTION:')) {
+                  suggestion = s.replace(/^SUGGESTION:\s*/, '').trim()
+                  break
+                }
+              }
+              if (suggestion) {
+                fixes.push({ agentName: r.agentName, file: m[1]!, line: parseInt(m[2]!), message: m[3]!, suggestion })
+              }
+            }
+          }
+
+          if (fixes.length === 0) {
+            console.log(chalk.gray('  No file-specific suggestions found. Review the findings above.'))
+          } else {
+            // Deduplicate: one fix per file (first finding wins)
+            const seen = new Set<string>()
+            const dedupedFixes = fixes.filter((f) => {
+              if (seen.has(f.file)) return false
+              seen.add(f.file)
+              return true
+            })
+
+            const session = createEditSession()
+            if (choice === 'apply') session.approveAll = true
+
+            for (const fix of dedupedFixes) {
+              console.log()
+              console.log(chalk.gray(`  ── ${fix.agentName}  `) + chalk.bold(`${fix.file}:${fix.line}`))
+              console.log(`  ${fix.message}`)
+              console.log()
+              console.log(chalk.cyan('  Fix: ') + fix.suggestion)
+
+              const fullPath = join(process.cwd(), fix.file)
+              if (!existsSync(fullPath)) {
+                console.log(chalk.gray(`  (file not found: ${fix.file})`))
+                continue
+              }
+
+              const existing = readFileSync(fullPath, 'utf-8')
+              const fileLines = existing.split('\n')
+
+              // Insert a targeted TODO comment at the exact line, not at the top of the file
+              const commentPrefix = fullPath.endsWith('.py') ? '# ' : '// '
+              const insertAt = Math.min(Math.max(fix.line - 1, 0), fileLines.length)
+              const todoLine = `${commentPrefix}nexarq (${fix.agentName}): ${fix.suggestion}`
+              const newLines = [...fileLines]
+              newLines.splice(insertAt, 0, todoLine)
+              const newContent = newLines.join('\n')
+
+              const displayPath = relative(process.cwd(), fullPath).replace(/\\/g, '/')
+              const decision = await approveEdit({ displayPath, fullPath, line: fix.line, oldContent: existing, newContent, session })
+              if (decision === 'yes') {
+                writeFileSync(fullPath, newContent, 'utf-8')
+                console.log(`  Applied fix to ${fix.file}`)
+              } else {
+                console.log(`  Skipped ${fix.file}`)
+              }
+            }
+          }
         }
       }
     } catch (runError) {
@@ -227,7 +297,8 @@ function formatSeveritySummary(summary: { critical: number; high: number; medium
   return parts.length ? '  ·  ' + parts.join('  ') : ''
 }
 
-function printDetailedReport(results: AgentResult[], durationMs: number): void {
+// Used in hook mode (no TUI available)
+function printDetailedReport(results: Array<{ error?: string; output: string; severity: string; agentName: string }>, durationMs: number): void {
   const cols = Math.max(process.stdout.columns ?? 80, 60)
   const ruleW = cols - 4
   const rule = chalk.gray('─'.repeat(ruleW))
@@ -238,22 +309,17 @@ function printDetailedReport(results: AgentResult[], durationMs: number): void {
   console.log(chalk.bold.cyan('  NEXARQ REVIEW REPORT') + chalk.gray(`  ·  ${results.length} agents  ·  ${elapsed}s`))
   console.log(rule)
 
-  // Sort by severity: critical → high → medium → low → info
   const order = ['critical', 'high', 'medium', 'low', 'info']
-  const sorted = [...results].sort(
-    (a, b) => order.indexOf(a.severity) - order.indexOf(b.severity)
-  )
+  const sorted = [...results].sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity))
 
   for (const result of sorted) {
     if (result.error) continue
     const output = result.output.trim()
     if (!output) continue
-
     const color = SEV_COLOR[result.severity] ?? chalk.gray
     console.log()
     console.log(color(`  [${result.severity.toUpperCase().padEnd(8)}]  `) + chalk.bold(result.agentName))
     console.log(chalk.gray('  ' + '─'.repeat(ruleW - 2)))
-
     for (const line of output.split('\n')) {
       console.log('    ' + line)
     }
@@ -262,3 +328,4 @@ function printDetailedReport(results: AgentResult[], durationMs: number): void {
   console.log()
   console.log(rule)
 }
+

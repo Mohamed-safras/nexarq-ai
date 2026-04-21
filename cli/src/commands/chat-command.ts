@@ -1,6 +1,9 @@
 import { Command } from 'commander'
 import { Input, Text } from '@opentui/core'
+import { resolve, relative } from 'node:path'
 import { loadConfig } from '../config/config-loader.ts'
+import { createEditSession } from '../lib/edit-approval.ts'
+import { streamingApproveEdit } from '../lib/streaming-preview.ts'
 import { createPageTUI } from '../lib/tui-page.ts'
 
 export function chatCommand(): Command {
@@ -20,6 +23,15 @@ export function chatCommand(): Command {
 
       const tui = await createPageTUI('CHAT  ·  Ctrl+C to exit', 'CONVERSATION', { exitOnCtrlC: false })
       const { theme } = tui
+      const editSession = createEditSession()
+      const onBeforeWrite = async (filePath: string, oldContent: string | null, newContent: string, line?: number): Promise<boolean> => {
+        tui.renderer.destroy()
+        const fullPath    = resolve(workingDirectory, filePath)
+        const displayPath = relative(workingDirectory, fullPath).replace(/\\/g, '/')
+        process.stdout.write('\n')
+        const decision = await streamingApproveEdit({ displayPath, fullPath, oldContent: oldContent ?? '', newContent, session: editSession, workingDirectory })
+        return decision === 'yes'
+      }
 
       const inputBox = Input({
         placeholder: 'Ask about your code...',
@@ -59,6 +71,7 @@ export function chatCommand(): Command {
             userMessage,
             workingDirectory,
             runConfig,
+            onBeforeWrite,
           })
 
           appendMessage('assistant', result.response)

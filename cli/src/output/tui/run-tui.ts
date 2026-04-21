@@ -377,8 +377,8 @@ export async function createRunTUI(diffLineCount: number): Promise<RunTUI> {
       const elapsed = (durationMs / 1000).toFixed(1)
       footerText = `  ${C.green}${BOLD}✓ Review complete${R}  ${C.dim}${elapsed}s  ·  any key to continue${R}`
       render()
-      // Auto-proceed after brief display so the fix prompt appears automatically
-      setTimeout(() => exitResolve?.(), process.stdin.isTTY ? 2500 : 100)
+      // Brief pause so the completion state is visible before the fix prompt
+      setTimeout(() => exitResolve?.(), process.stdin.isTTY ? 800 : 100)
     },
 
     waitForExit(): Promise<void> {

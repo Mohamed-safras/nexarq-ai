@@ -43,7 +43,7 @@ export interface NexarqGraphState {
   errorMessage?: string
   knowledgeContext?: string
   onEvent?: (event: RunEvent) => void
-  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string, line?: number) => Promise<boolean>
 
   // ── Review flow ─────────────────────────────────────────────────────────────
   diffResult?: DiffResult

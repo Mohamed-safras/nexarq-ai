@@ -18,7 +18,7 @@ export interface WorkflowRunOptions {
    * Called before each file write by a coding agent.
    * Return true to proceed, false to skip the write.
    */
-  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string, line?: number) => Promise<boolean>
 }
 
 export interface WorkflowRunResult {
