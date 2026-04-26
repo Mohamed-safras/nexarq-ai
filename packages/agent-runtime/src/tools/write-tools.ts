@@ -42,7 +42,7 @@ function isCommandAllowed(command: string): boolean {
  */
 export function getWriteTools(
   workingDirectory: string,
-  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string) => Promise<boolean>,
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string, line?: number) => Promise<boolean>,
 ) {
   const safeResolve = (filePath: string): string => {
     const absolutePath = resolve(workingDirectory, filePath)
@@ -66,6 +66,7 @@ export function getWriteTools(
         const proceed = await onBeforeWrite(filePath, oldContent, content)
         if (!proceed) return `[SKIPPED] Write to "${filePath}" was declined by the user.`
       }
+
 
       if (oldContent !== null) {
         writeFileSync(`${absolutePath}.nexarq-backup`, oldContent, 'utf-8')
@@ -118,5 +119,39 @@ export function getWriteTools(
     }
   )
 
-  return [writeFileTool, runCommandTool]
+  const strReplaceTool = tool(
+    async ({ filePath, oldString, newString }: { filePath: string; oldString: string; newString: string }): Promise<string> => {
+      const absolutePath = safeResolve(filePath)
+
+      if (!existsSync(absolutePath)) return `[ERROR] File not found: "${filePath}"`
+
+      const oldContent = readFileSync(absolutePath, 'utf-8')
+      const idx = oldContent.indexOf(oldString)
+      if (idx === -1) return `[ERROR] String not found in "${filePath}". Ensure the text matches exactly including whitespace.`
+
+      const line = oldContent.slice(0, idx).split('\n').length
+      const newContent = oldContent.slice(0, idx) + newString + oldContent.slice(idx + oldString.length)
+
+      if (onBeforeWrite) {
+        const proceed = await onBeforeWrite(filePath, oldContent, newContent, line)
+        if (!proceed) return `[SKIPPED] Edit to "${filePath}" was declined by the user.`
+      }
+
+      writeFileSync(absolutePath, newContent, 'utf-8')
+      return `Replaced at line ${line} in "${filePath}".`
+    },
+    {
+      name: 'str_replace',
+      description:
+        'Replace an exact string in a file. Prefer over write_file for targeted edits — ' +
+        'requires the old string to match character-for-character including indentation.',
+      schema: z.object({
+        filePath:  z.string().describe('Relative path from project root'),
+        oldString: z.string().describe('Exact text to replace (must match verbatim)'),
+        newString: z.string().describe('Replacement text'),
+      }),
+    }
+  )
+
+  return [writeFileTool, strReplaceTool, runCommandTool]
 }

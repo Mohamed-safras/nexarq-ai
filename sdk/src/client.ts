@@ -1,6 +1,7 @@
 import { runOrchestrator, runWorkflowOrchestrator } from '@nexarq/agent-runtime'
 import type { OrchestratorRunResult, WorkflowRunResult } from '@nexarq/agent-runtime'
-import type { RunConfig, RunEvent } from '@nexarq/common/types'
+import type { RunEvent } from '@nexarq/common/types'
+import type { RunConfig } from '@nexarq/common/interfaces'
 import type { TriggerSource } from '@nexarq/agent-runtime'
 
 export interface NexarqClientOptions {
@@ -81,12 +82,12 @@ export class NexarqClient {
       triggerSource: reviewOptions.triggerSource ?? 'sdk',
       workingDirectory: reviewOptions.workingDirectory ?? process.cwd(),
       runConfig: {
-        agents: reviewOptions.agents,
+        ...(reviewOptions.agents ? { agents: reviewOptions.agents } : {}),
         mode: reviewOptions.mode ?? 'smart',
-        provider: this.options.provider,
-        model: this.options.model,
+        ...(this.options.provider ? { provider: this.options.provider } : {}),
+        ...(this.options.model ? { model: this.options.model } : {}),
       },
-      onEvent: reviewOptions.onEvent,
+      ...(reviewOptions.onEvent ? { onEvent: reviewOptions.onEvent } : {}),
     })
   }
 

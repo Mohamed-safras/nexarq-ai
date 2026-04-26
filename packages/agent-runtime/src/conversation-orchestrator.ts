@@ -33,6 +33,7 @@ export interface ConversationTurnOptions {
   workingDirectory: string
   runConfig?: RunConfig
   onEvent?: (event: RunEvent) => void
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string, line?: number) => Promise<boolean>
 }
 
 export interface ConversationTurnResult {
@@ -119,6 +120,7 @@ function buildMetaTools(
   onEvent: ((event: RunEvent) => void) | undefined,
   getLastReview: () => StoredReview | null,
   setLastReview: (r: StoredReview) => void,
+  onBeforeWrite?: (filePath: string, oldContent: string | null, newContent: string, line?: number) => Promise<boolean>,
 ) {
   // ── trigger_review: full parallel fan-out ────────────────────────────────
   const triggerReviewTool = tool(
@@ -253,7 +255,8 @@ function buildMetaTools(
           task,
           workingDirectory,
           runConfig,
-          ...(onEvent ? { onEvent } : {}),
+          ...(onEvent        ? { onEvent }        : {}),
+          ...(onBeforeWrite  ? { onBeforeWrite }   : {}),
         })
 
         const files = result.modifiedFiles.length > 0
@@ -302,7 +305,7 @@ function buildMetaTools(
 export async function runConversationTurn(
   options: ConversationTurnOptions
 ): Promise<ConversationTurnResult> {
-  const { userMessage, workingDirectory, runConfig = {}, onEvent } = options
+  const { userMessage, workingDirectory, runConfig = {}, onEvent, onBeforeWrite } = options
 
   const session = loadSession(workingDirectory)
   let lastReview: StoredReview | null = session.lastReview
@@ -312,7 +315,7 @@ export async function runConversationTurn(
   const setLastReview = (r: StoredReview) => { lastReview = r; reviewTriggered = true }
 
   // ── Tool set ─────────────────────────────────────────────────────────────
-  const metaTools = buildMetaTools(workingDirectory, runConfig, onEvent, () => lastReview, setLastReview)
+  const metaTools = buildMetaTools(workingDirectory, runConfig, onEvent, () => lastReview, setLastReview, onBeforeWrite)
   const allTools = [
     ...getReadTools(workingDirectory),
     ...getTerminalTools(workingDirectory),

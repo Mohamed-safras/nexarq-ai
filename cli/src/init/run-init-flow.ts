@@ -24,12 +24,13 @@ export async function runInitFlow(): Promise<void> {
 
   await saveConfig({
     provider:     wizard.provider,
+    model:        wizard.model,
     cloudConsent: wizard.cloudConsent,
     theme:        variant,
   })
 
-  if (wizard.installPostCommit) await installHook('post-commit')
-  if (wizard.installPrePush)    await installHook('pre-push')
+  if (wizard.installPostCommit) await installHook('post-commit').catch(() => {})
+  if (wizard.installPrePush)    await installHook('pre-push').catch(() => {})
 }
 
 export async function safeRunInitFlow(): Promise<boolean> {

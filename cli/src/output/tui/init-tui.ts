@@ -1,14 +1,26 @@
 import { confirm, input, select } from '@inquirer/prompts'
+import { execSync } from 'child_process'
 import type { ProviderName } from '@nexarq/common/types'
+import { PROVIDER_MODELS, PROVIDER_DEFAULT_MODELS } from '@nexarq/common/constants'
 import type { NexarqTheme } from './theme.ts'
 import { HEADER_LINE_COUNT, printHeader } from './welcome-tui.ts'
 
 export interface InitWizardResult {
   provider: ProviderName
+  model: string
   apiKey?: string
   installPostCommit: boolean
   installPrePush: boolean
   cloudConsent: boolean
+}
+
+function isGitRepo(): boolean {
+  try {
+    execSync('git rev-parse --git-dir', { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Erase `n` lines above the cursor and reposition there, ready to print fresh content.
@@ -45,8 +57,22 @@ export async function runInitWizard(theme: NexarqTheme): Promise<InitWizardResul
   })
   linesAbove = HEADER_LINE_COUNT + 1
 
-  // Total is now known: ollama skips API key + consent, non-ollama has all steps
-  const TOTAL = provider === 'ollama' ? 4 : 6
+  // ── Choose model ──────────────────────────────────────────────────────────
+  eraseStepArea(linesAbove)
+  printHeader(theme)
+
+  const model = await select<string>({
+    message: 'Step 3 · Choose your model\n',
+    choices: PROVIDER_MODELS[provider].map((m) => ({ name: m, value: m })),
+    default: PROVIDER_DEFAULT_MODELS[provider],
+  })
+  linesAbove = HEADER_LINE_COUNT + 1
+
+  // Determine whether we're inside a git repo — skip hook prompts if not
+  const hasGit = isGitRepo()
+
+  // Total steps: base 3 (theme + provider + model) + optional API key + git hooks + consent
+  const TOTAL = 3 + (provider !== 'ollama' ? 1 : 0) + (hasGit ? 2 : 0) + (provider !== 'ollama' ? 1 : 0)
 
   // ── API key (non-ollama only) ─────────────────────────────────────────────
   let apiKey: string | undefined
@@ -58,7 +84,7 @@ export async function runInitWizard(theme: NexarqTheme): Promise<InitWizardResul
     printHeader(theme)
 
     apiKey = await input({
-      message: `Step 3 / ${TOTAL} · Enter your ${providerLabel} API key`,
+      message: `Step 4 / ${TOTAL} · Enter your ${providerLabel} API key`,
       transformer: (value) => {
         if (value.length > 8) return value.slice(0, 4) + '...' + value.slice(-4)
         return value
@@ -69,29 +95,31 @@ export async function runInitWizard(theme: NexarqTheme): Promise<InitWizardResul
     linesAbove = HEADER_LINE_COUNT + 1 + 1
   }
 
-  // ── Post-commit hook ──────────────────────────────────────────────────────
-  const postStep = provider === 'ollama' ? 3 : 4
+  // ── Git hooks (only shown when inside a git repo) ─────────────────────────
+  let installPostCommit = false
+  let installPrePush = false
 
-  eraseStepArea(linesAbove)
-  printHeader(theme)
+  if (hasGit) {
+    const postStep = provider === 'ollama' ? 4 : 5
 
-  const installPostCommit = await confirm({
-    message: `Step ${postStep} / ${TOTAL} · Install post-commit hook?  (auto-reviews every git commit)`,
-    default: false,
-  })
-  linesAbove = HEADER_LINE_COUNT + 1
+    eraseStepArea(linesAbove)
+    printHeader(theme)
 
-  // ── Pre-push hook ─────────────────────────────────────────────────────────
-  const preStep = provider === 'ollama' ? 4 : 5
+    installPostCommit = await confirm({
+      message: `Step ${postStep} / ${TOTAL} · Install post-commit hook?  (auto-reviews every git commit)`,
+      default: false,
+    })
+    linesAbove = HEADER_LINE_COUNT + 1
 
-  eraseStepArea(linesAbove)
-  printHeader(theme)
+    eraseStepArea(linesAbove)
+    printHeader(theme)
 
-  const installPrePush = await confirm({
-    message: `Step ${preStep} / ${TOTAL} · Install pre-push hook?  (blocks push on CRITICAL or HIGH findings)`,
-    default: false,
-  })
-  linesAbove = HEADER_LINE_COUNT + 1
+    installPrePush = await confirm({
+      message: `Step ${postStep + 1} / ${TOTAL} · Install pre-push hook?  (blocks push on CRITICAL or HIGH findings)`,
+      default: false,
+    })
+    linesAbove = HEADER_LINE_COUNT + 1
+  }
 
   // ── Cloud consent (non-ollama only) ───────────────────────────────────────
   let cloudConsent = false
@@ -101,7 +129,7 @@ export async function runInitWizard(theme: NexarqTheme): Promise<InitWizardResul
     printHeader(theme)
 
     cloudConsent = await confirm({
-      message: `Step 6 / ${TOTAL} · Send diffs to ${provider}?  (only diffs, never your full codebase)`,
+      message: `Step ${TOTAL} / ${TOTAL} · Send diffs to ${provider}?  (only diffs, never your full codebase)`,
       default: true,
     })
     linesAbove = HEADER_LINE_COUNT + 1
@@ -118,6 +146,7 @@ export async function runInitWizard(theme: NexarqTheme): Promise<InitWizardResul
 
   return {
     provider,
+    model,
     ...(apiKey?.trim() ? { apiKey: apiKey.trim() } : {}),
     installPostCommit,
     installPrePush,

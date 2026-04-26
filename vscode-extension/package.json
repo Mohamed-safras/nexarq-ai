@@ -1,0 +1,71 @@
+{
+  "name": "nexarq",
+  "displayName": "Nexarq — AI Code Review",
+  "description": "Multi-agent AI code review: ghost text findings, review panel, inline diff, and code actions",
+  "version": "0.1.0",
+  "publisher": "nexarq",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nexarq.runReview",
+        "title": "Nexarq: Run Review"
+      },
+      {
+        "command": "nexarq.showPanel",
+        "title": "Nexarq: Show Review Panel"
+      },
+      {
+        "command": "nexarq.clearDecorations",
+        "title": "Nexarq: Clear Inline Findings"
+      }
+    ],
+    "configuration": {
+      "title": "Nexarq",
+      "properties": {
+        "nexarq.cliPath": {
+          "type": "string",
+          "default": "nexarq",
+          "description": "Path to the nexarq CLI executable"
+        },
+        "nexarq.mode": {
+          "type": "string",
+          "default": "smart",
+          "enum": [
+            "fast",
+            "smart",
+            "deep"
+          ],
+          "description": "Review mode"
+        },
+        "nexarq.autoRunOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run review when files are saved"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs",
+    "watch": "npm run build -- --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.116.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.0"
+  }
+}

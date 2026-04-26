@@ -49,31 +49,32 @@ function formatFindingsContext(results: AgentResult[]): string {
  * - Can do targeted codebase searches to trace cross-agent findings
  * - Can look up CVEs via web_search
  *
- * In 'fast' mode the triage node is skipped (direct to summary).
- * In 'smart' and 'deep' modes it runs after the parallel fan-out.
+ * Skipped in 'fast' and 'smart' modes — triage adds multiple LLM roundtrips
+ * which would dominate latency for interactive on-demand reviews.
+ * Only runs in 'deep' mode where thoroughness matters more than speed.
  */
 export async function runTriageNode(state: NexarqGraphState): Promise<Partial<NexarqGraphState>> {
   const mode = state.runConfig.mode ?? 'smart'
 
-  // Skip in fast mode — speed is the priority
-  if (mode === 'fast') return { triageOutput: '' }
+  // Triage runs a ReAct loop (multiple LLM roundtrips + tool calls).
+  // Only run in 'deep' mode — fast and smart prioritise speed over cross-checking.
+  if (mode !== 'deep') return { triageOutput: '' }
 
   // Skip if no results came back
   if (state.agentResults.length === 0) return { triageOutput: '' }
-
-  const criticalOrHigh = state.agentResults.filter(
-    (r) => r.severity === 'critical' || r.severity === 'high'
-  )
-
-  // In 'smart' mode skip if nothing critical/high — not worth the extra latency
-  if (mode === 'smart' && criticalOrHigh.length === 0) return { triageOutput: '' }
 
   state.onEvent?.({ type: 'agent:start', agentName: 'triage' })
   const startTime = Date.now()
 
   const findingsContext = formatFindingsContext(state.agentResults)
   const workingDirectory = state.workingDirectory ?? process.cwd()
-  const tools = [...getReadTools(workingDirectory), ...getTerminalTools(workingDirectory)]
+
+  // In smart mode, skip heavyweight tools (web_search, run_validation) to keep latency low.
+  // Deep mode gets the full tool set for thorough cross-checking.
+  const readTools = getReadTools(workingDirectory)
+  const tools = mode === 'deep'
+    ? [...readTools, ...getTerminalTools(workingDirectory)]
+    : readTools.filter((t: { name?: string }) => t.name !== 'web_search')
 
   const userPrompt = `Here are all findings from the parallel review agents:
 
@@ -96,7 +97,7 @@ Be concise. Focus on what adds new information.`
       TRIAGE_SYSTEM,
       userPrompt,
       tools,
-      { temperature: 0.1, maxTokens: 2048 }
+      { temperature: 0.1, maxTokens: mode === 'deep' ? 2048 : 1024 }
     )
 
     state.onEvent?.({

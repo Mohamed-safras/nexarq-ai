@@ -85,35 +85,83 @@ All agents share `SHARED_SYSTEM_PREFIX` (structured output instructions + CoT pr
 
 **User overrides:** `config.agents` (array of agent names) always overrides automatic selection. `config.mode = 'fast'` restricts to Tier 1 only.
 
-## Review Tools (read-only)
+## Tool Sets
 
-Available to Tier 1 and Tier 2 agents when `needsTools: true`:
+Tools are grouped into sets and composed per surface. Each set has its own file in `packages/agent-runtime/src/tools/`.
+
+### Read Tools (`read-tools.ts`)
+
+Available to all agents and conversation turns:
 
 | Tool | Description |
 |------|-------------|
-| `read_file` | Read a file's contents (path must be within working directory) |
-| `search_code` | Ripgrep-style pattern search across the codebase |
-| `list_directory` | List files in a directory with type info |
-| `find_references` | Find all references to a symbol across files |
-| `git_log` | Read recent git history for a file |
+| `read_file` | Read a file's contents (path-traversal protected) |
+| `search_code` | Ripgrep-style regex search across the codebase |
+| `list_directory` | List files with type info |
+| `find_references` | Find all references to a symbol |
+| `git_log` | Recent git history for a file |
+| `web_search` | Brave Search — requires `NEXARQ_BRAVE_API_KEY` |
 
-All paths are validated against the working directory — no path traversal.
+### Write Tools (`write-tools.ts`)
 
-## Coding Tools (read-write)
-
-Available only when `triggerSource === 'coding-agent'`:
+Available to coding agents (coder-node, implement_task):
 
 | Tool | Description |
 |------|-------------|
 | `write_file` | Create or overwrite a file |
-| `run_command` | Execute a command from a strict allowlist |
-| `git_diff` | Show uncommitted changes |
-| `git_status` | Show working tree status |
+| `str_replace` | Targeted line replacement (prefer over full rewrites) |
 
-**Command allowlist** (enforced in `run_command`):
-`npm`, `bun`, `tsc`, `eslint`, `prettier`, `jest`, `vitest`, `cargo`, `go`, `python`, `pip`, `mvn`, `gradle`, `make`, `git`
+### Terminal Tools (`terminal-tools.ts`)
 
-Commands are not run with a shell — arguments are passed as an array to avoid injection.
+Safe validation runner — always available, no unsafe flag needed:
+
+| Tool | Description |
+|------|-------------|
+| `run_validation` | Allowlisted: `tsc`, `bun test/run`, `npm test/run`, `jest`, `vitest`, `eslint`, `pytest`, `cargo test`, `go test` |
+
+### Shell Tools (`shell-tools.ts`)
+
+Controlled by `RunConfig.unsafeShell`:
+
+| Tool | `unsafeShell=false` | `unsafeShell=true` |
+|------|--------------------|--------------------|
+| `run_shell` | Validation commands only | Any command except `rm -rf /`, fork bombs, disk wipes |
+
+Enable with `nexarq config set unsafeShell true` or pass `unsafeShell: true` in `RunConfig`.
+
+### Docs Tools (`docs-tools.ts`)
+
+Dynamic library documentation fetcher — no predefined list:
+
+| Tool | Description |
+|------|-------------|
+| `read_docs` | Brave Search → top docs URL → Jina Reader markdown → section focus |
+
+Requires `NEXARQ_BRAVE_API_KEY`. Results are cached per session (Map keyed by `library:topic`).
+
+### Browser Tools (`browser-tools.ts`)
+
+Playwright automation — optional dependency:
+
+| Tool | Description |
+|------|-------------|
+| `open_page` | Navigate to a URL and return page text |
+| `get_page_text` | Read text from current browser page |
+| `click_element` | Click a CSS selector |
+| `fill_form` | Fill an input field |
+| `take_screenshot` | Capture current page as base64 PNG |
+| `close_browser` | Release the shared browser instance |
+
+Playwright is lazily imported. If not installed, tools return instructions to run `npx playwright install`.
+
+### Tool Composition per Surface
+
+| Surface | Read | Write | Terminal | Shell | Docs | Browser |
+|---------|------|-------|----------|-------|------|---------|
+| Review agents | ✓ | — | — | — | — | — |
+| Coder agents | ✓ | ✓ | — | — | — | — |
+| Conversation REPL | ✓ | — | ✓ | opt-in | ✓ | ✓ |
+| `implement_task` (meta-tool) | ✓ | ✓ | — | — | — | — |
 
 ## Agent Prompt Structure
 

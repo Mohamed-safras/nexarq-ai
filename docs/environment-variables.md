@@ -34,6 +34,17 @@ Keys are stored in the system keyring (keytar) by `nexarq init` — not in files
 | `NEXARQ_GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret | Web only |
 | `NEXARQ_GITHUB_WEBHOOK_SECRET` | HMAC secret for verifying webhook payloads | Web webhook |
 
+## Web Search & Docs (optional)
+
+Used by the `web_search` and `read_docs` tools in the conversation and coding agents.
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXARQ_BRAVE_API_KEY` | Brave Search API key — enables `web_search` and auto-docs lookup | Optional (tools degrade gracefully without it) |
+| `NEXARQ_JINA_API_KEY` | Jina Reader API key — higher rate limits for doc fetching | Optional (Jina works without key at lower limits) |
+
+Without `NEXARQ_BRAVE_API_KEY`, `web_search` and `read_docs` return a "key not configured" message. Web search is not required for code review or coding — only for research and docs-aware assistance.
+
 ## LangSmith Tracing
 
 All optional. When `LANGCHAIN_TRACING_V2=true`, every agent run is traced.

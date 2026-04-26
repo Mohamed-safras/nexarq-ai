@@ -114,7 +114,12 @@ export async function uninstallHook(hookType: 'post-commit' | 'pre-push'): Promi
 }
 
 export async function getHookStatus(): Promise<Record<string, boolean>> {
-  const hooksDir = getGitHooksDir()
+  let hooksDir: string
+  try {
+    hooksDir = getGitHooksDir()
+  } catch {
+    return { 'post-commit': false, 'pre-push': false }
+  }
 
   return Object.fromEntries(
     ['post-commit', 'pre-push'].map((hookType) => {
